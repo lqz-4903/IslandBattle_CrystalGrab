@@ -2,7 +2,7 @@
 using System.Collections.Concurrent;
 using System.Threading;
 using UnityEngine;
-s
+
 public static class ThreadUtil
 {
     // 用来记住游戏启动时，主线程的身份证号（ID）
