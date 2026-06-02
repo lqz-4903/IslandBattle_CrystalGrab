@@ -4,7 +4,7 @@ option csharp_namespace = "GameProto";
 
 // ============== 信封：所有网络消息都包在这里 ============
 
-message NetMess{
+message NetMessage{
 	oneof msg{
 
 		// 底层系统
@@ -25,7 +25,7 @@ message NetMess{
 		PlayerInput   player_input		= 21;
 
 		// 游戏事件
-		CrystalSpawn  crystal_spwan		= 30;
+		CrystalSpawn  crystal_spawn		= 30;
 		CrystalPickup crystal_pickup	= 31;
 		PlayerHit 	  player_hit		= 32;
 		PlayerFall	  player_fall		= 33;

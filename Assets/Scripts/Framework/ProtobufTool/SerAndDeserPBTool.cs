@@ -7,9 +7,15 @@ using System.Reflection;
 /// 用于快速地对Protobuf生成的内容进行序列化和反序列化
 /// </summary>
 
-public static class NetTool 
+public static class SerAndDeserPBTool
 {
-    //序列化Protobuf生成的对象
+    /// <summary>
+    /// 序列化
+    /// Protobuf生成的对象
+    /// 官方为 .WriteTo
+    /// </summary>
+    /// <param name="msg"></param>
+    /// <returns></returns>
     public static byte[] GetProtoBytes( IMessage msg )
     {
         //拓展方法、里氏替换、接口 这些知识点 都在 C#相关的内容当中
@@ -28,7 +34,9 @@ public static class NetTool
     }
 
     /// <summary>
-    /// 反序列化字节数组为Protobuf相关的对象
+    /// 反序列化
+    /// 字节数组为Protobuf相关的对象
+    /// 官方为 .Parser.ParserFrom(data);
     /// </summary>
     /// <typeparam name="T">想要获取的消息类型</typeparam>
     /// <param name="bytes">对应的字节数组 用于反序列化</param>

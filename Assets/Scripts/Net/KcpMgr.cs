@@ -99,7 +99,7 @@ public class KcpMgr : IKcpCallback
     /// 客户端：只有一个实例
     /// 多线程安全（ConcurrentDictionary）
     /// </summary>
-    private ConcurrentDictionary<uint, SimpleSegManager.Kcp> kcpDic = new ConcurrentDictionary<uint, SimpleSegManager.Kcp>();
+    private ConcurrentDictionary<uint, SimpleSegManager.Kcp> _kcpDic = new ConcurrentDictionary<uint, SimpleSegManager.Kcp>();
 
     // ───────── 地址 ↔ 会话 双向映射 ─────────
 
@@ -107,13 +107,13 @@ public class KcpMgr : IKcpCallback
     /// 正向映射：端点字符串("IP:Port") → 会话ID(conv)
     /// 用途：收到 UDP 包时根据来源地址找 KCP 实例
     /// </summary>
-    private ConcurrentDictionary<string, uint> endPointToConvDic = new ConcurrentDictionary<string, uint>();
+    private ConcurrentDictionary<string, uint> _endPointToConvDic = new ConcurrentDictionary<string, uint>();
 
     /// <summary>
     /// 反向映射：会话ID(conv) → 端点(EndPoint)
     /// 用途：发送数据时知道目标 IP:Port
     /// </summary>
-    private ConcurrentDictionary<uint, EndPoint> convToEndPointDic = new ConcurrentDictionary<uint, EndPoint>();
+    private ConcurrentDictionary<uint, EndPoint> _convToEndPointDic = new ConcurrentDictionary<uint, EndPoint>();
 
     // ───────── 收发队列 ─────────
 
@@ -122,7 +122,7 @@ public class KcpMgr : IKcpCallback
     /// 生产者：UdpRecvLoop（KCP.Recv 解出消息后入队）
     /// 消费者：Unity 主线程 Update() 中 TryRecv() 出队
     /// </summary>
-    private ConcurrentQueue<(uint conv, byte[] data)> recvQuene = new ConcurrentQueue<(uint conv, byte[] data)>();
+    private ConcurrentQueue<(uint conv, byte[] data)> _recvQuene = new ConcurrentQueue<(uint conv, byte[] data)>();
 
     /// <summary>
     /// 发送通道：生产者-消费者模式
@@ -130,26 +130,26 @@ public class KcpMgr : IKcpCallback
     /// 消费者：KcpSendLoop ReadAsync() 读取
     /// 无界队列，写入永不阻塞
     /// </summary>
-    private Channel<(uint conv, byte[] data)> sendChannel = Channel.CreateUnbounded<(uint conv, byte[] data)>();
+    private Channel<(uint conv, byte[] data)> _sendChannel = Channel.CreateUnbounded<(uint conv, byte[] data)>();
 
     // ───────── UDP Socket 与缓冲区 ─────────
 
     /// <summary>UDP Socket 实例</summary>
-    private Socket socket;
+    private Socket _socket;
 
     /// <summary>
     /// UDP 原始数据接收缓冲区（复用，避免 GC）
     /// 大小 65535 = UDP 单包理论最大值
     /// 仅 UdpRecvLoop 单线程读写
     /// </summary>
-    private byte[] recvBuffer = new byte[65535];
+    private byte[] _recvBuffer = new byte[65535];
 
     /// <summary>
     /// KCP 解包后的业务数据缓冲区（复用）
     /// KCP.Recv() 将重组好的消息写入此缓冲区
     /// 仅 UdpRecvLoop 单线程读写
     /// </summary>
-    private byte[] kcpBuffer = new byte[65535];
+    private byte[] _kcpBuffer = new byte[65535];
 
     // ───────── 运行状态 ─────────
 
@@ -158,39 +158,39 @@ public class KcpMgr : IKcpCallback
     /// Start → true，Stop → false
     /// 三个后台循环线程以此作为退出条件
     /// </summary>
-    private bool isRunning = false;
+    private bool _isRunning = false;
 
     /// <summary>
     /// 运行模式
     /// true = 服务器（可接受多客户端），false = 客户端（连一台服务器）
     /// </summary>
-    private bool isServerMode = true;
+    private bool _isServerMode = true;
 
     /// <summary>
     /// 客户端模式下服务器的地址
     /// StartAsClientAsync 中设置，Output 回调时用于 SendTo
     /// </summary>
-    private EndPoint serverEndPoint;
+    private EndPoint _serverEndPoint;
 
     /// <summary>
     /// 下一个可分配的会话ID（原子递增）
     /// 起始 1000，避免与客户端常用默认值冲突
     /// </summary>
-    private int nextConvID = 1000;
+    private int _nextConvID = 1000;
 
     // ───────── 线程控制 ─────────
 
     /// <summary>取消令牌源，Cancel() 后三个后台线程优雅退出</summary>
-    private CancellationTokenSource cts;
+    private CancellationTokenSource _cts;
 
     /// <summary>UDP 接收线程句柄</summary>
-    private Task udpRecvTask;
+    private Task _udpRecvTask;
 
     /// <summary>KCP 发送处理线程句柄</summary>
-    private Task kcpSendTask;
+    private Task _kcpSendTask;
 
     /// <summary>KCP 状态更新线程句柄（超时重传/拥塞控制）</summary>
-    private Task kcpUpdateTask;
+    private Task _kcpUpdateTask;
 
     // ───────── 对外回调事件 ─────────
 
@@ -224,25 +224,25 @@ public class KcpMgr : IKcpCallback
     #region ==================== KCP 配置参数（默认值） ====================
 
     /// <summary>无延迟模式：0=关闭, 1=开启。游戏建议 1</summary>
-    private int noDelay = 1;
+    private int _noDelay = 1;
 
     /// <summary>内部刷新间隔(ms)，越小延迟越低CPU越高。游戏建议 10</summary>
-    private int interval = 10;
+    private int _interval = 10;
 
     /// <summary>快速重传阈值，后续包确认达此次数即重传。典型 2-5</summary>
-    private int resend = 2;
+    private int _resend = 2;
 
     /// <summary>流控开关：0=开启拥塞控制, 1=关闭(全速发)</summary>
-    private int nc = 1;
+    private int _nc = 1;
 
     /// <summary>发送窗口（同时在途最大包数）。典型 128-512</summary>
-    private int sendWin = 128;
+    private int _sendWin = 128;
 
     /// <summary>接收窗口（最大缓存乱序包数）。应 ≥ sendWin</summary>
-    private int recvWin = 128;
+    private int _recvWin = 128;
 
     /// <summary>最大传输单元(字节)。局域网1500，互联网建议1400</summary>
-    private int mtu = 1400;
+    private int _mtu = 1400;
 
     #endregion
 
@@ -258,12 +258,12 @@ public class KcpMgr : IKcpCallback
     /// </summary>
     public async Task SetNoDelayAsync(int noDelay, int interval, int resend, int nc)
     {
-        this.noDelay = noDelay;
-        this.interval = interval;
-        this.resend = resend;
-        this.nc = nc;
+        this._noDelay = noDelay;
+        this._interval = interval;
+        this._resend = resend;
+        this._nc = nc;
 
-        foreach (var kcp in kcpDic.Values)
+        foreach (var kcp in _kcpDic.Values)
             kcp.NoDelay(noDelay, interval, resend, nc);
 
         await Task.CompletedTask;
@@ -272,10 +272,10 @@ public class KcpMgr : IKcpCallback
     /// <summary>设置收发窗口大小（运行时动态调整）</summary>
     public async Task SetWinSizeAsync(int sendWin, int recvWin)
     {
-        this.sendWin = sendWin;
-        this.recvWin = recvWin;
+        this._sendWin = sendWin;
+        this._recvWin = recvWin;
 
-        foreach (var kcp in kcpDic.Values)
+        foreach (var kcp in _kcpDic.Values)
             kcp.WndSize(sendWin, recvWin);
 
         await Task.CompletedTask;
@@ -284,9 +284,9 @@ public class KcpMgr : IKcpCallback
     /// <summary>设置最大传输单元 MTU（运行时动态调整）</summary>
     public async Task SetMTUAsync(int mtu)
     {
-        this.mtu = mtu;
+        this._mtu = mtu;
 
-        foreach (var kcp in kcpDic.Values)
+        foreach (var kcp in _kcpDic.Values)
             kcp.SetMtu(mtu);
 
         await Task.CompletedTask;
@@ -305,25 +305,25 @@ public class KcpMgr : IKcpCallback
     /// <param name="port">监听端口，默认 8888</param>
     public async Task StartAsServerAsync(int port = 8888)
     {
-        if (isRunning)
+        if (_isRunning)
         {
             Debug.Log("【KCPMgr】已经在运行");
             return;
         }
 
-        isServerMode = true;
+        _isServerMode = true;
 
         try
         {
-            socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            socket.Bind(new IPEndPoint(IPAddress.Any, port));
+            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            _socket.Bind(new IPEndPoint(IPAddress.Any, port));
 
-            cts = new CancellationTokenSource();
-            isRunning = true;
+            _cts = new CancellationTokenSource();
+            _isRunning = true;
 
-            udpRecvTask = Task.Run(UdpRecvLoop);
-            kcpSendTask = Task.Run(KcpSendLoop);
-            kcpUpdateTask = Task.Run(KcpUpdateLoop);
+            _udpRecvTask = Task.Run(UdpRecvLoop);
+            _kcpSendTask = Task.Run(KcpSendLoop);
+            _kcpUpdateTask = Task.Run(KcpUpdateLoop);
 
             Debug.Log("【KcpMgr】服务器启动成功，端口：" + port);
         }
@@ -348,34 +348,34 @@ public class KcpMgr : IKcpCallback
     /// <param name="localPort">本地端口，0=系统随机</param>
     public async Task StartAsClientAsync(string serverIP, int serverPort, uint convID = 0, int localPort = 0)
     {
-        if (isRunning)
+        if (_isRunning)
         {
             Debug.Log("【KCPMgr】已经在运行");
             return;
         }
 
-        isServerMode = false;
+        _isServerMode = false;
 
         try
         {
-            socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
 
             if (localPort > 0)
-                socket.Bind(new IPEndPoint(IPAddress.Any, localPort));
+                _socket.Bind(new IPEndPoint(IPAddress.Any, localPort));
             else
-                socket.Bind(new IPEndPoint(IPAddress.Any, 0));
+                _socket.Bind(new IPEndPoint(IPAddress.Any, 0));
 
-            serverEndPoint = new IPEndPoint(IPAddress.Parse(serverIP), serverPort);
+            _serverEndPoint = new IPEndPoint(IPAddress.Parse(serverIP), serverPort);
 
             uint conv = convID == 0 ? 1 : convID;
-            CreateKcpInstance(conv, serverEndPoint, true);
+            CreateKcpInstance(conv, _serverEndPoint, true);
 
-            cts = new CancellationTokenSource();
-            isRunning = true;
+            _cts = new CancellationTokenSource();
+            _isRunning = true;
 
-            udpRecvTask = Task.Run(UdpRecvLoop);
-            kcpSendTask = Task.Run(KcpSendLoop);
-            kcpUpdateTask = Task.Run(KcpUpdateLoop);
+            _udpRecvTask = Task.Run(UdpRecvLoop);
+            _kcpSendTask = Task.Run(KcpSendLoop);
+            _kcpUpdateTask = Task.Run(KcpUpdateLoop);
 
             Debug.Log("【KcpMgr】客户端启动成功，连接：" + serverIP + ":" + serverPort);
         }
@@ -395,29 +395,29 @@ public class KcpMgr : IKcpCallback
     /// </summary>
     public async Task StopAsync()
     {
-        if (!isRunning) return;
+        if (!_isRunning) return;
 
-        isRunning = false;
-        cts?.Cancel();
+        _isRunning = false;
+        _cts?.Cancel();
 
         // 等待三个线程退出，最多等 1 秒
-        if (udpRecvTask != null)
-            await Task.WhenAny(udpRecvTask, Task.Delay(1000));
-        if (kcpSendTask != null)
-            await Task.WhenAny(kcpSendTask, Task.Delay(1000));
-        if (kcpUpdateTask != null)
-            await Task.WhenAny(kcpUpdateTask, Task.Delay(1000));
+        if (_udpRecvTask != null)
+            await Task.WhenAny(_udpRecvTask, Task.Delay(1000));
+        if (_kcpSendTask != null)
+            await Task.WhenAny(_kcpSendTask, Task.Delay(1000));
+        if (_kcpUpdateTask != null)
+            await Task.WhenAny(_kcpUpdateTask, Task.Delay(1000));
 
         // 销毁所有 KCP 实例
-        foreach (var kcp in kcpDic.Values)
+        foreach (var kcp in _kcpDic.Values)
             kcp?.Dispose();
-        kcpDic.Clear();
-        endPointToConvDic.Clear();
-        convToEndPointDic.Clear();
+        _kcpDic.Clear();
+        _endPointToConvDic.Clear();
+        _convToEndPointDic.Clear();
 
         // 关闭 Socket
-        socket?.Close();
-        socket = null;
+        _socket?.Close();
+        _socket = null;
 
         Debug.Log("【KcpMgr】服务已停止");
     }
@@ -437,7 +437,7 @@ public class KcpMgr : IKcpCallback
     /// </summary>
     private void CreateKcpInstance(uint conv, EndPoint remoteEndPoint, bool isClient = false)
     {
-        if (kcpDic.ContainsKey(conv))
+        if (_kcpDic.ContainsKey(conv))
         {
             Debug.Log("【KcpMgr】Kcp实例已存在 Conv：" + conv);
             return;
@@ -446,19 +446,19 @@ public class KcpMgr : IKcpCallback
         SimpleSegManager.Kcp kcp = new SimpleSegManager.Kcp(conv, this);
 
         // 应用当前配置
-        kcp.NoDelay(noDelay, interval, resend, nc);
-        kcp.WndSize(sendWin, recvWin);
-        kcp.SetMtu(mtu);
+        kcp.NoDelay(_noDelay, _interval, _resend, _nc);
+        kcp.WndSize(_sendWin, _recvWin);
+        kcp.SetMtu(_mtu);
 
         // 注册到三个字典
-        kcpDic[conv] = kcp;
+        _kcpDic[conv] = kcp;
 
         string endPointKey = GetEndPointKey(remoteEndPoint);
-        endPointToConvDic[endPointKey] = conv;
-        convToEndPointDic[conv] = remoteEndPoint;
+        _endPointToConvDic[endPointKey] = conv;
+        _convToEndPointDic[conv] = remoteEndPoint;
 
         // 服务器模式下通知业务层：有新客户端连入
-        if (!isClient && isServerMode)
+        if (!isClient && _isServerMode)
         {
             OnClientConnected?.Invoke(conv);
         }
@@ -467,7 +467,7 @@ public class KcpMgr : IKcpCallback
     /// <summary>根据 conv 获取 KCP 实例，不存在返回 null</summary>
     private SimpleSegManager.Kcp GetKcp(uint conv)
     {
-        kcpDic.TryGetValue(conv, out SimpleSegManager.Kcp kcp);
+        _kcpDic.TryGetValue(conv, out SimpleSegManager.Kcp kcp);
         return kcp;
     }
 
@@ -475,7 +475,7 @@ public class KcpMgr : IKcpCallback
     private uint GetConvByEndPoint(EndPoint endPoint)
     {
         string key = GetEndPointKey(endPoint);
-        if (endPointToConvDic.TryGetValue(key, out uint conv))
+        if (_endPointToConvDic.TryGetValue(key, out uint conv))
             return conv;
         return 0;
     }
@@ -512,7 +512,7 @@ public class KcpMgr : IKcpCallback
             // 取出有效数据（局部变量，线程安全）
             byte[] sendData = buffer.Memory.Span.Slice(0, avalidLength).ToArray();
 
-            if (isServerMode)
+            if (_isServerMode)
             {
                 // 从 KCP 包头（前4字节，小端序）读取目标 conv
                 uint targetConv = 0;
@@ -523,11 +523,11 @@ public class KcpMgr : IKcpCallback
                         | (sendData[3] << 24));
 
                 // 查找目标 endpoint 并发送
-                if (convToEndPointDic.TryGetValue(targetConv, out var targetEndPoint))
+                if (_convToEndPointDic.TryGetValue(targetConv, out var targetEndPoint))
                 {
                     try
                     {
-                        socket.SendTo(sendData, targetEndPoint);
+                        _socket.SendTo(sendData, targetEndPoint);
                     }
                     catch (SocketException se)
                     {
@@ -543,7 +543,7 @@ public class KcpMgr : IKcpCallback
             else
             {
                 // 客户端模式：固定发往服务器
-                socket.SendTo(sendData, serverEndPoint);
+                _socket.SendTo(sendData, _serverEndPoint);
             }
 
             buffer.Dispose();
@@ -570,14 +570,14 @@ public class KcpMgr : IKcpCallback
     /// </summary>
     private async Task UdpRecvLoop()
     {
-        while (isRunning && socket != null)
+        while (_isRunning && _socket != null)
         {
             try
             {
                 EndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
 
                 // 在 Task.Run 中阻塞接收，避免卡住 async 状态机
-                int udpLen = await Task.Run(() => socket.ReceiveFrom(recvBuffer, ref remoteEndPoint));
+                int udpLen = await Task.Run(() => _socket.ReceiveFrom(_recvBuffer, ref remoteEndPoint));
 
                 if (udpLen > 0)
                 {
@@ -586,37 +586,37 @@ public class KcpMgr : IKcpCallback
                     // 先用 endpoint 查（已知客户端走这条路，最快）
                     uint conv = GetConvByEndPoint(remoteEndPoint);
 
-                    if (conv == 0 && isServerMode)
+                    if (conv == 0 && _isServerMode)
                     {
                         // endpoint 未知 → 新客户端首次连接
                         // 从 KCP 包头读 conv（前4字节，小端序）
                         if (udpLen >= 4)
-                            conv = (uint)(recvBuffer[0]
-                                | (recvBuffer[1] << 8)
-                                | (recvBuffer[2] << 16)
-                                | (recvBuffer[3] << 24));
+                            conv = (uint)(_recvBuffer[0]
+                                | (_recvBuffer[1] << 8)
+                                | (_recvBuffer[2] << 16)
+                                | (_recvBuffer[3] << 24));
 
                         // 兜底：读取失败则分配新 ID
                         if (conv == 0)
-                            conv = (uint)Interlocked.Increment(ref nextConvID);
+                            conv = (uint)Interlocked.Increment(ref _nextConvID);
 
                         // 冲突检测：conv 已被其他 endpoint 占用 → 重新分配
-                        if (convToEndPointDic.ContainsKey(conv))
+                        if (_convToEndPointDic.ContainsKey(conv))
                         {
                             string currentKey = GetEndPointKey(remoteEndPoint);
-                            string mappedKey = GetEndPointKey(convToEndPointDic[conv]);
+                            string mappedKey = GetEndPointKey(_convToEndPointDic[conv]);
                             if (currentKey != mappedKey)
-                                conv = (uint)Interlocked.Increment(ref nextConvID);
+                                conv = (uint)Interlocked.Increment(ref _nextConvID);
                         }
 
                         // 创建实例，注册 endpoint ↔ conv 映射
                         CreateKcpInstance(conv, remoteEndPoint);
                     }
-                    else if (conv == 0 && !isServerMode)
+                    else if (conv == 0 && !_isServerMode)
                     {
                         // 客户端模式：服务器回复时可能还没映射
                         conv = 1;
-                        if (!kcpDic.ContainsKey(conv))
+                        if (!_kcpDic.ContainsKey(conv))
                             CreateKcpInstance(conv, remoteEndPoint, true);
                     }
 
@@ -626,31 +626,31 @@ public class KcpMgr : IKcpCallback
                     if (kcp != null)
                     {
                         // 将原始 UDP 数据喂入 KCP（内部分片重组）
-                        kcp.Input(recvBuffer.AsSpan(0, udpLen));
+                        kcp.Input(_recvBuffer.AsSpan(0, udpLen));
 
                         // 循环取出所有已重组完成的完整消息
                         while (true)
                         {
-                            int msgLen = kcp.Recv(kcpBuffer);
+                            int msgLen = kcp.Recv(_kcpBuffer);
                             if (msgLen <= 0) break;
 
                             byte[] msgData = new byte[msgLen];
-                            Array.Copy(kcpBuffer, msgData, msgLen);
+                            Array.Copy(_kcpBuffer, msgData, msgLen);
 
                             // 入队，等待主线程消费
-                            recvQuene.Enqueue((conv, msgData));
+                            _recvQuene.Enqueue((conv, msgData));
                         }
                     }
                 }
             }
             catch (SocketException se)
             {
-                if (isRunning)
+                if (_isRunning)
                     Debug.Log("【KcpMgr】UDP接收异常：" + se.ErrorCode + " " + se.Message);
             }
             catch (Exception e)
             {
-                if (isRunning)
+                if (_isRunning)
                     Debug.Log("【KcpMgr】UDP接收异常：" + e.Message);
             }
         }
@@ -666,14 +666,14 @@ public class KcpMgr : IKcpCallback
     /// </summary>
     private async Task KcpSendLoop()
     {
-        var reader = sendChannel.Reader;
+        var reader = _sendChannel.Reader;
 
-        while (isRunning)
+        while (_isRunning)
         {
             try
             {
                 // 无数据时挂起等待（不占 CPU）
-                var result = await reader.ReadAsync(cts.Token);
+                var result = await reader.ReadAsync(_cts.Token);
                 var (conv, data) = result;
 
                 SimpleSegManager.Kcp kcp = GetKcp(conv);
@@ -713,13 +713,13 @@ public class KcpMgr : IKcpCallback
     {
         const int updateIntervalMs = 10;
 
-        while (isRunning)
+        while (_isRunning)
         {
             try
             {
-                await Task.Delay(updateIntervalMs, cts.Token);
+                await Task.Delay(updateIntervalMs, _cts.Token);
 
-                foreach (var kcp in kcpDic.Values)
+                foreach (var kcp in _kcpDic.Values)
                 {
                     kcp.Update(DateTime.UtcNow);
                 }
@@ -749,13 +749,13 @@ public class KcpMgr : IKcpCallback
     /// <param name="data">业务数据</param>
     public async Task SendAsync(uint conv, byte[] data)
     {
-        if (!isRunning)
+        if (!_isRunning)
         {
             Debug.Log("【KcpMgr】服务未运行");
             return;
         }
 
-        await sendChannel.Writer.WriteAsync((conv, data));
+        await _sendChannel.Writer.WriteAsync((conv, data));
     }
 
     /// <summary>
@@ -778,7 +778,7 @@ public class KcpMgr : IKcpCallback
     /// <returns>true=取出一条消息, false=队列空</returns>
     public bool TryRecv(out uint conv, out byte[] data)
     {
-        if (recvQuene.TryDequeue(out var item))
+        if (_recvQuene.TryDequeue(out var item))
         {
             conv = item.conv;
             data = item.data;
@@ -794,7 +794,7 @@ public class KcpMgr : IKcpCallback
     /// </summary>
     public bool TryRecvMsg(out uint conv, out string msg)
     {
-        if (recvQuene.TryDequeue(out var item))
+        if (_recvQuene.TryDequeue(out var item))
         {
             conv = item.conv;
             msg = Encoding.UTF8.GetString(item.data);
@@ -811,11 +811,11 @@ public class KcpMgr : IKcpCallback
     /// </summary>
     public async Task<(uint conv, byte[] data)> RecvAsync(CancellationToken token = default)
     {
-        var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, token);
+        var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, token);
 
-        while (isRunning)
+        while (_isRunning)
         {
-            if (recvQuene.TryDequeue(out var item))
+            if (_recvQuene.TryDequeue(out var item))
                 return item;
             await Task.Delay(1, combinedCts.Token);
         }
@@ -828,10 +828,10 @@ public class KcpMgr : IKcpCallback
     /// </summary>
     public uint[] GetConnectClients()
     {
-        if (!isServerMode) return new uint[0];
+        if (!_isServerMode) return new uint[0];
 
-        uint[] clients = new uint[kcpDic.Keys.Count];
-        kcpDic.Keys.CopyTo(clients, 0);
+        uint[] clients = new uint[_kcpDic.Keys.Count];
+        _kcpDic.Keys.CopyTo(clients, 0);
         return clients;
     }
 
@@ -842,14 +842,14 @@ public class KcpMgr : IKcpCallback
     /// </summary>
     public async Task DisconClientAsync(uint conv)
     {
-        if (kcpDic.TryRemove(conv, out SimpleSegManager.Kcp kcp))
+        if (_kcpDic.TryRemove(conv, out SimpleSegManager.Kcp kcp))
         {
             kcp?.Dispose();
 
-            if (convToEndPointDic.TryRemove(conv, out var endPoint))
+            if (_convToEndPointDic.TryRemove(conv, out var endPoint))
             {
                 string key = GetEndPointKey(endPoint);
-                endPointToConvDic.TryRemove(key, out _);
+                _endPointToConvDic.TryRemove(key, out _);
             }
 
             OnClientDisconnected?.Invoke(conv, "主动断开");
@@ -906,7 +906,7 @@ public class KcpMgr : IKcpCallback
     /// </summary>
     public void Update()
     {
-        while (recvQuene.TryDequeue(out var item))
+        while (_recvQuene.TryDequeue(out var item))
         {
             OnRecvData?.Invoke(item.conv, item.data);
 
