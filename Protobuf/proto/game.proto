@@ -1,0 +1,167 @@
+syntax = "proto3";
+package Game;
+option csharp_namespace = "GameProto";
+
+// ============== 信封：所有网络消息都包在这里 ============
+
+message NetMess{
+	oneof msg{
+
+		// 底层系统
+		HeartBeat 	  heartbeat			= 1;
+		KickOff		  kick_off			= 2;
+
+		// 房间
+		CreateRoom 	  create_room   	= 10;
+		CreateRoomAck create_room_ack	= 11;
+		JoinRoom 	  join_room 		= 12;
+		JoinRoomAck	  join_room_ack		= 13;
+		PlayerList	  player_list		= 14;
+		StartGame	  start_game		= 15;
+		GameStart	  game_start		= 16;
+
+		// 帧同步
+		InputFrame	  input_frame		= 20;
+		PlayerInput   player_input		= 21;
+
+		// 游戏事件
+		CrystalSpawn  crystal_spwan		= 30;
+		CrystalPickup crystal_pickup	= 31;
+		PlayerHit 	  player_hit		= 32;
+		PlayerFall	  player_fall		= 33;
+		GameEnd		  game_end			= 34;
+
+		// 重连
+		Reconnect 	  reconnect 		= 40;
+		ReconnectAck  reconnect_ack		= 41;
+		CatchUPFrames  catch_up_frames	= 42;
+
+	}
+}
+
+// ============== 底层系统消息 ============
+
+message HeartBeat {
+  int64 time = 1;
+}
+
+message KickOff {
+  string reason = 1;
+}
+
+// ============== 房间消息 ============
+
+message CreateRoom{
+	string host_name 	= 1;
+}
+
+message CreateRoomAck{
+	bool   success 		= 1;
+	int32  room_id		= 2;
+	int32  player_id	= 3;
+	string error 		= 4;
+}
+
+message JoinRoom{
+	int32  room_id 		= 1;
+	string player_name 	= 2;
+}
+
+message JoinRoomAck{
+	bool   success 		= 1;
+	int32  player_id 	= 2;
+	string error 		= 3;
+}
+
+message PlayerInfo{
+	int32  player_id 	= 1;
+	string name 		= 2;
+	bool   is_host	   	= 3;
+}
+
+message PlayerList{
+	repeated PlayerInfo players = 1;
+}
+
+message StartGame{
+	// 房主发的 无字段 就是一个信号
+}
+
+message GameStart{
+	int32 random_seed	= 1;
+	int32 player_count 	= 2;
+	float game_duration	= 3;	// 秒
+	int32 target_score	= 4;
+	int32 tick_rate		= 5;	// 20
+}
+
+// ============== 帧同步消息 ============
+
+// 一帧里一个玩家的输入
+message PlayerInput{
+	int32  player_id	= 1;
+	int32  tick 		= 2;
+	uint32 move_dir		= 3;	// 4bit： bit0 = W | bit1 = S | bit2 = A | bit3 = D
+	bool   attack		= 4;	// 左键点击（这一tick按下）
+	bool   skill		= 5;	// 右键松开（蓄力释放 仅松开那一tick为true）
+	float  camera_yaw	= 6;	// 摄像机水平角度（度） 决定WASD的前方
+	float  charge_time	= 7;	// 右键蓄力时长（秒） skill = true 时有效
+}
+
+// Host广播： 一帧所有玩家的输入
+message InputFrame{
+	int32 				 tick 	 = 1;
+	repeated PlayerInput inputs	 = 2;
+}
+
+// 客户端发给Host的单帧输入
+//（直接用PlayerInput 不用再包一层）
+
+// ============== 游戏事件 ============
+
+message CrystalSpawn{
+	int32 crystal_id = 1;
+	float pos_x		 = 2;
+	float pos_y		 = 3;
+	float pos_z 	 = 4; 
+}
+
+message CrystalPickup{
+	int32 crystal_id	= 1;
+	int32 player_id		= 2;
+	int32 new_score		= 3;
+}
+
+message PlayerHit{
+	int32 attacker_id	= 1;
+	int32 victim_id		= 2;
+	int32 dropped_count = 3;		// 掉了几颗
+}
+
+message PlayerFall{
+	int32 player_id 	= 1;
+	int32 dropped_count = 2;		// 掉了全部晶石数
+}
+
+message GameEnd{
+	repeated int32 scores 	 = 1;	// index = player_id
+	int32 		   winner_id = 2;
+}
+
+// ============== 短线重连 ============
+
+message Reconnect{
+	int32 player_id = 1;				// 我的玩家ID（证明身份）
+	int32 last_tick = 2;				// 客户端最后收到的tick
+}
+
+message ReconnectAck{
+	bool  success		= 1;			// 重连是否成功
+	int32 catch_up_from = 2;			// 你从【这一帧】开始补数据
+}
+
+message CatchUPFrames{
+	int32 				from_tick = 1;	// 从哪一帧开始
+	int32 				to_tick	  = 2;	// 到哪一帧结束
+	repeated InputFrame frams  	  = 3;	// 这段时间所有玩家的输入帧
+}

@@ -2,22 +2,12 @@
 using System.IO;
 using UnityEditor;
 
-/// <summary>
-/// Protobuf协议生成工具
-/// 用Protobuf生成对应的C#代码
-/// </summary>
-
 public class ProtobufTool
 {
-    //协议配置文件所在路径
     private static string PROTO_PATH = @"D:\UnityProgram\Unity_ProjectDemo\Protobuf\proto";
-    //协议生成可执行文件路径
     private static string PROTOC_PATH = @"D:\UnityProgram\Unity_ProjectDemo\Protobuf\protoc.exe";
-    //C#文件生成的路径
     private static string CSHARP_PATH = @"D:\UnityProgram\Unity_ProjectDemo\Protobuf\csharp";
-    //CPP文件生成的路径
     private static string CPP_PATH = @"D:\UnityProgram\Unity_ProjectDemo\Protobuf\cpp";
-
 
     [MenuItem("ProtobufTool/通过proto.exe生成C#代码")]
     public static void GenerateCSharp()
@@ -31,31 +21,47 @@ public class ProtobufTool
         Generate("cpp_out", CPP_PATH);
     }
 
-    //生成对应脚本的方法
     public static void Generate(string outCmd, string outPath)
     {
-        // 第一步：遍历对应协议配置文件夹 得到所有的配置文件
-        DirectoryInfo directoryInfo = Directory.CreateDirectory(PROTO_PATH);
-        //获取对应文件夹下所有文件信息
-        FileInfo[] files = directoryInfo.GetFiles();
-        //遍历所有的文件 为其生成协议脚本
-        for (int i = 0; i < files.Length; i++)
+        //自动创建输出目录
+        if (!Directory.Exists(outPath))
         {
-            //后缀的判断 只有是 配置文件才能用于生成
-            if (files[i].Extension == ".proto")
-            {
-                // 第二步：根据文件内容 来生成对应的C#脚本 （需要使用C#当中的Process类）
-                Process cmd = new Process();
-                // protoc.exe的路径
-                cmd.StartInfo.FileName = PROTOC_PATH;
-                //命令
-                cmd.StartInfo.Arguments = $"-I={PROTO_PATH} --{outCmd}={outPath} {files[i]}";
-                //执行
-                cmd.Start();
-                //告诉外部 某一个文件生成结束
-                UnityEngine.Debug.Log(files[i] + "生成结束");
-            }
+            Directory.CreateDirectory(outPath);
+            UnityEngine.Debug.Log($"已创建目录:{outPath}");
         }
-        UnityEngine.Debug.Log("所有内容生成结束");
+
+        FileInfo[] protoFiles = new DirectoryInfo(PROTO_PATH).GetFiles("*.proto");
+        foreach (var file in protoFiles)
+        {
+            Process cmd = new Process();
+            cmd.StartInfo.FileName = PROTOC_PATH;
+            //路径加引号防空格
+            cmd.StartInfo.Arguments = $"-I=\"{PROTO_PATH}\" --{outCmd}=\"{outPath}\" \"{file.FullName}\"";
+
+            //【核心配置：捕获cmd报错】
+            cmd.StartInfo.UseShellExecute = false;
+            cmd.StartInfo.RedirectStandardError = true; //捕获错误
+            cmd.StartInfo.RedirectStandardOutput = true; //捕获正常日志
+            cmd.StartInfo.CreateNoWindow = true;
+
+            cmd.Start();
+            cmd.WaitForExit();
+
+            //读取错误信息，红字打印
+            string errorMsg = cmd.StandardError.ReadToEnd();
+            string outMsg = cmd.StandardOutput.ReadToEnd();
+
+            //正常输出白字
+            if (!string.IsNullOrEmpty(outMsg))
+                UnityEngine.Debug.Log($"{file.Name} 输出信息：{outMsg}");
+            //错误红字
+            if (!string.IsNullOrEmpty(errorMsg))
+                UnityEngine.Debug.LogError($"{file.Name}【protoc报错】：{errorMsg}");
+            else
+                UnityEngine.Debug.Log($"{file.Name} 生成成功！");
+
+            cmd.Close();
+        }
+        UnityEngine.Debug.Log("===全部生成处理完成===");
     }
 }
