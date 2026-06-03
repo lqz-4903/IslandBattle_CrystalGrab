@@ -91,7 +91,7 @@ public class NetMgr : MonoBehaviour
     private NetMgr() { }
 
     // ==== 跨线程队列 ====
-    private readonly ConcurrentQueue<(int msgId, IMessage msg)> _pending = new();
+    private readonly ConcurrentQueue<(int msgId, uint conv, IMessage msg)> _pending = new();
 
     /// <summary>
     /// 客户端默认使用的会话ID（客户端固定为1）
@@ -115,13 +115,13 @@ public class NetMgr : MonoBehaviour
         // 主线程取出 直接派发给事件中心
         while (_pending.TryDequeue(out var item))
         {
-            EventCenter.Dispatch(item.msgId, item.msg);
+            EventCenter.Dispatch(item.msgId,item.conv, item.msg);
         }
 
         //从KcpMgr去网络数据（必须每帧调用）
         while (KcpMgr.Instance.TryRecv(out uint conv, out byte[] data))
         {
-            OnRecvData(data);
+            OnRecvData(conv, data);
         }
     }
 
@@ -145,7 +145,7 @@ public class NetMgr : MonoBehaviour
 
     #region 收消息
 
-    public void OnRecvData(byte[] data)
+    public void OnRecvData(uint conv, byte[] data)
     {
         try
         {
@@ -200,7 +200,7 @@ public class NetMgr : MonoBehaviour
             };
 
             if (msgId != 0 && payload != null)
-                _pending.Enqueue((msgId, payload));
+                _pending.Enqueue((msgId, conv, payload));
         }
         catch (Exception e)
         {

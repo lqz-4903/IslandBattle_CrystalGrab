@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine.Events;
 using System;
+using System.Diagnostics;
 
 /// <summary>
 /// 封装了UnityAction<T>, 避免传入object类产生开装箱的消耗
@@ -37,7 +38,11 @@ public static class EventCenter
     // value - 对应的是 监听这个事件 对应的委托函数们
     private static readonly Dictionary<string, IUnityAction_package> _eventStringDic = new();
 
+    // 网络事件字典 
     private static readonly Dictionary<int, UnityAction<IMessage>> _eventIntDic = new();
+
+    // 带conv的网络事件字典
+    private static readonly Dictionary<int, UnityAction<uint, IMessage>> _eventIntConvDic = new();
 
     #region 事件监听
 
@@ -96,6 +101,28 @@ public static class EventCenter
                 _eventIntDic[msgId] += callback;
             else
                 _eventIntDic[msgId] = callback;
+        }
+    }
+
+    /// <summary>
+    /// 注册网络事件（带conv 可获取消息来源客户端）
+    /// </summary>
+    /// <param name="msgId"></param>
+    /// <param name="callback"></param>
+    public static void AddListener(int msgId, UnityAction<uint, IMessage> callback)
+    {
+        if (callback == null)
+        {
+            UnityEngine.Debug.Log("AddListener error, callback is null, msgId is " + msgId);
+            return;
+        }
+
+        lock (_eventIntConvDic)
+        {
+            if (_eventIntConvDic.ContainsKey(msgId))
+                _eventIntConvDic[msgId] += callback;
+            else
+                _eventIntConvDic[msgId] = callback;
         }
     }
 
@@ -172,11 +199,39 @@ public static class EventCenter
                 handlers -= callback;
                 _eventIntDic[msgId] = handlers;
 
-                // 没有回调了就清楚键，避免内存垃圾
+                // 没有回调了就清除键，避免内存垃圾
                 if (handlers == null)
                     _eventIntDic.Remove(msgId);
             }
         }
+    }
+
+    /// <summary>
+    /// 移除网络事件（带conv）
+    /// </summary>
+    /// <param name="msgId"></param>
+    /// <param name="callback"></param>
+    public static void RemoveListener(int msgId, UnityAction<uint, IMessage> callback)
+    {
+        if (callback == null)
+        {
+            UnityEngine.Debug.Log("RemoveListener error, callback is null, msgId is " + msgId);
+            return;
+        }
+
+        lock (_eventIntConvDic)
+        {
+            if (_eventIntConvDic.TryGetValue(msgId, out var handlers))
+            {
+                handlers -= callback;
+                _eventIntConvDic[msgId] = handlers;
+
+                // 没有回调了就清除键，避免内存垃圾
+                if (handlers == null)
+                    _eventIntConvDic.Remove(msgId);
+            }
+        }
+
     }
     
     #endregion
@@ -278,6 +333,41 @@ public static class EventCenter
         }
     }
 
+    /// <summary>
+    /// 派发网络事件（带conv版本）
+    /// </summary>
+    public static void Dispatch(int msgId, uint conv, IMessage message)
+    {
+        if (ThreadUtil.IsMainThread())
+            DispatchInternal(msgId, conv, message);
+        else
+            ThreadUtil.RunOnMainThread(() => DispatchInternal(msgId, conv, message));
+    }
+
+    /// <summary>带conv派发内部实现</summary>
+    private static void DispatchInternal(int msgId, uint conv, IMessage message)
+    {
+        UnityAction<uint, IMessage> handlers = null;
+
+        lock (_eventIntConvDic)
+        {
+            if (_eventIntConvDic.TryGetValue(msgId, out var d))
+                handlers = d;
+        }
+
+        if (handlers == null) return;
+
+        try
+        {
+            handlers.Invoke(conv, message);
+        }
+        catch (Exception e)
+        {
+            UnityEngine.Debug.Log("Event Dispatch Error, msgId: " + msgId + " | " + e.Message);
+        }
+    }
+
+
     #endregion
 
     /// <summary>
@@ -293,6 +383,11 @@ public static class EventCenter
         lock (_eventStringDic)
         {
             _eventStringDic.Clear();
+        }
+
+        lock (_eventIntConvDic)
+        {
+            _eventIntConvDic.Clear();
         }
     }
 

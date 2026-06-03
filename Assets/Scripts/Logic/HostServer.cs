@@ -1,6 +1,8 @@
 ﻿using GameProto;
 using Google.Protobuf;
 using System;
+using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 
 /// <summary>
@@ -30,14 +32,14 @@ using UnityEngine;
 
 public class HostServer : MonoBehaviour
 {
-    #region 单例
+    #region =============== 单例 ===============
     private static HostServer _instance;
     public static HostServer Intansce => _instance;
     private HostServer() { }
 
     #endregion
 
-    #region 子处理器
+    #region =============== 子处理器 ===============
 
     // 房间管理（创建/加入/开始游戏）
     private RoomHandler _roomHandler;
@@ -50,7 +52,7 @@ public class HostServer : MonoBehaviour
 
     #endregion
 
-    #region 状态
+    #region =============== 状态 =============== 
 
     // 服务器是否正在运行
     private bool _isRunning;
@@ -61,43 +63,129 @@ public class HostServer : MonoBehaviour
     public bool IsGameStarted => _isGameStarted;
 
     // 当前房间数据（由RoomHandler管理）
-    public 
+    public RoomData CurrentRoom;
 
     // 默认端口
+    private const int DEFAULT_PORT = 8888;
+
+    #endregion
+
+    #region =============== 生命周期 =============== 
+
+    private void Awake()
+    {
+        _instance = this;
+
+        _roomHandler = new RoomHandler(this);
+        _frameSyncHandler = new FrameSyncHandler(this);
+        _gameEventHandler = new GameEventHandler(this);
+
+        _frameExcutor = GetComponent<FrameExcutor>();
+        if (_frameExcutor = null)
+            _frameExcutor = gameObject.AddComponent<FrameExcutor>();
+    }
+
+
+    #endregion
+
+    #region =============== 事件注册 ===============
+
+    private void SubscribeEvents()
+    {
+        EventCenter.AddListener(10, OnCreateRoom);
+        EventCenter.AddListener(12, OnJoinRoom);
+        EventCenter.AddListener(16, OnGameStart);
+ 
+    }
+
+    private void UnSubscribEvents()
+    {
+
+    }
+
+    // 房间
+    private void OnCreateRoom(uint conv, IMessage msg)
+    {
+        if (!_isRunning) return;
+        _roomHandler.HandleCreateRoom(conv, msg as CreateRoom);
+    }
+
+    private void OnJoinRoom(uint conv, IMessage msg)
+    {
+        if (!_isRunning) return;
+        _roomHandler.HandleJoinRoom(conv, msg as JoinRoom);
+    }
+
+    private void OnGameStart(uint conv, IMessage msg)
+    {
+        if (!_isRunning) return;
+        _roomHandler.HandlerGameStart(conv, msg as GameStart);
+    }
+
+
+    #endregion
+
+    #region =============== 游戏状态管理 ===============
+
+    /// <summary>
+    /// 由 RoomHandler 调用，标记游戏开始
+    /// </summary>
+    public void OnStartGame()
+    {
+        _isGameStarted = true;
+
+        // 将玩家集合传给帧同步和游戏事件处理器
+        var playerIds = CurrentRoom.GetAllPlayerProtos();
+
+        Debug.Log("【HostServer】游戏开始，玩家数：" + playerIds);
+    }
+
 
     #endregion
 
 
+    #region =============== 网络工具方法 ===============
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    // Start is called before the first frame update
-    void Start()
+    /// <summary>
+    /// 向指定客户端发送消息
+    /// </summary>
+    /// <param name="conv"></param>
+    /// <param name="msg"></param>
+    public void SendToClient(uint conv, NetMessage msg)
     {
-        _instance = this;
+        byte[] data = SerAndDeserPBTool.GetProtoBytes(msg);
+        KcpMgr.Instance.SendAsync(conv, data).Forget();
     }
 
-    // Update is called once per frame
-    void Update()
+    /// <summary>
+    /// 向所有已连接客户端广播消息
+    /// </summary>
+    /// <param name="msg"></param>
+    public void BroadcastToAll(NetMessage msg)
     {
-        
+        byte[] data = SerAndDeserPBTool.GetProtoBytes(msg);
+        uint[] clients = KcpMgr.Instance.GetConnectClients();
+        foreach (uint conv in clients)
+        {
+            KcpMgr.Instance.SendAsync(conv, data).Forget();
+        }
     }
+
+    /// <summary>
+    /// 像除指定客户端外的所有客户端广播
+    /// </summary>
+    /// <param name="excludeConv"></param>
+    /// <param name="msg"></param>
+    public void BroadcastExcept(uint excludeConv, NetMessage msg)
+    {
+        byte[] data = SerAndDeserPBTool.GetProtoBytes(msg);
+        uint[] clients = KcpMgr.Instance.GetConnectClients();
+        foreach (uint conv in clients)
+        {
+            if (conv != excludeConv)
+                KcpMgr.Instance.SendAsync(conv, data).Forget();
+        }
+    }
+
+    #endregion
 }

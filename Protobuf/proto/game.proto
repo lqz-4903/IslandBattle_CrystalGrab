@@ -69,7 +69,7 @@ message CreateRoomAck{
 
 // 12
 message JoinRoom{
-	int32  room_id 		= 1;
+	string  room_id 		= 1;
 	string player_name 	= 2;
 }
 
@@ -78,6 +78,8 @@ message JoinRoomAck{
 	bool   success 		= 1;
 	int32  player_id 	= 2;
 	string error 		= 3;
+	string room_id = 4;
+	repeated PlayerInfo players = 5;
 }
 
 // 17
@@ -103,7 +105,7 @@ message GameStart{
 	int32 player_count 	= 2;
 	float game_duration	= 3;	// 秒
 	int32 target_score	= 4;
-	int32 tick_rate		= 5;	// 20
+	int32 frame_rate		= 5;	// 20
 }
 
 // ============== 帧同步消息 ============

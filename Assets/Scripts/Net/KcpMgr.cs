@@ -74,6 +74,12 @@ using UnityEngine;
 ///
 /// ═══════════════════════════════════════════════════════════════
 /// </summary>
+
+public static class ClassForNothing { /* 为了避免调用KcpMgr时产生过长的说明 */ }
+
+/// <summary>
+/// KcpMgr - 基于 KCP 协议的 UDP 网络管理器（单例）
+/// </summary>
 public class KcpMgr : IKcpCallback
 {
     #region ==================== 单例 ====================

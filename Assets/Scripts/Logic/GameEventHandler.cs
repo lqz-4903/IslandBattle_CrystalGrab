@@ -1,18 +1,12 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class GameEventHandler : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
+    private HostServer _host;
+    public GameEventHandler(HostServer host)
     {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
+        _host = host;
     }
 }

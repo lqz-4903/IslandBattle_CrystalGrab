@@ -1,18 +1,12 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class FrameSyncHandler : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
+    private HostServer _host;
+    public FrameSyncHandler(HostServer host)
     {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
+        _host = host;
     }
 }
