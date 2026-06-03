@@ -24,7 +24,7 @@ namespace GameProto {
     static GameReflection() {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
-            "CgpnYW1lLnByb3RvEgRHYW1lIqMGCgpOZXRNZXNzYWdlEiQKCWhlYXJ0YmVh",
+            "CgpnYW1lLnByb3RvEgRHYW1lIswGCgpOZXRNZXNzYWdlEiQKCWhlYXJ0YmVh",
             "dBgBIAEoCzIPLkdhbWUuSGVhcnRCZWF0SAASIQoIa2lja19vZmYYAiABKAsy",
             "DS5HYW1lLktpY2tPZmZIABInCgtjcmVhdGVfcm9vbRgKIAEoCzIQLkdhbWUu",
             "Q3JlYXRlUm9vbUgAEi4KD2NyZWF0ZV9yb29tX2FjaxgLIAEoCzITLkdhbWUu",
@@ -32,56 +32,57 @@ namespace GameProto {
             "blJvb21IABIqCg1qb2luX3Jvb21fYWNrGA0gASgLMhEuR2FtZS5Kb2luUm9v",
             "bUFja0gAEicKC3BsYXllcl9saXN0GA4gASgLMhAuR2FtZS5QbGF5ZXJMaXN0",
             "SAASJQoKc3RhcnRfZ2FtZRgPIAEoCzIPLkdhbWUuU3RhcnRHYW1lSAASJQoK",
-            "Z2FtZV9zdGFydBgQIAEoCzIPLkdhbWUuR2FtZVN0YXJ0SAASJwoLaW5wdXRf",
-            "ZnJhbWUYFCABKAsyEC5HYW1lLklucHV0RnJhbWVIABIpCgxwbGF5ZXJfaW5w",
-            "dXQYFSABKAsyES5HYW1lLlBsYXllcklucHV0SAASKwoNY3J5c3RhbF9zcGF3",
-            "bhgeIAEoCzISLkdhbWUuQ3J5c3RhbFNwYXduSAASLQoOY3J5c3RhbF9waWNr",
-            "dXAYHyABKAsyEy5HYW1lLkNyeXN0YWxQaWNrdXBIABIlCgpwbGF5ZXJfaGl0",
-            "GCAgASgLMg8uR2FtZS5QbGF5ZXJIaXRIABInCgtwbGF5ZXJfZmFsbBghIAEo",
-            "CzIQLkdhbWUuUGxheWVyRmFsbEgAEiEKCGdhbWVfZW5kGCIgASgLMg0uR2Ft",
-            "ZS5HYW1lRW5kSAASJAoJcmVjb25uZWN0GCggASgLMg8uR2FtZS5SZWNvbm5l",
-            "Y3RIABIrCg1yZWNvbm5lY3RfYWNrGCkgASgLMhIuR2FtZS5SZWNvbm5lY3RB",
-            "Y2tIABIuCg9jYXRjaF91cF9mcmFtZXMYKiABKAsyEy5HYW1lLkNhdGNoVVBG",
-            "cmFtZXNIAEIFCgNtc2ciGQoJSGVhcnRCZWF0EgwKBHRpbWUYASABKAMiGQoH",
-            "S2lja09mZhIOCgZyZWFzb24YASABKAkiHwoKQ3JlYXRlUm9vbRIRCglob3N0",
-            "X25hbWUYASABKAkiUwoNQ3JlYXRlUm9vbUFjaxIPCgdzdWNjZXNzGAEgASgI",
-            "Eg8KB3Jvb21faWQYAiABKAUSEQoJcGxheWVyX2lkGAMgASgFEg0KBWVycm9y",
-            "GAQgASgJIjAKCEpvaW5Sb29tEg8KB3Jvb21faWQYASABKAUSEwoLcGxheWVy",
-            "X25hbWUYAiABKAkiQAoLSm9pblJvb21BY2sSDwoHc3VjY2VzcxgBIAEoCBIR",
-            "CglwbGF5ZXJfaWQYAiABKAUSDQoFZXJyb3IYAyABKAkiPgoKUGxheWVySW5m",
-            "bxIRCglwbGF5ZXJfaWQYASABKAUSDAoEbmFtZRgCIAEoCRIPCgdpc19ob3N0",
-            "GAMgASgIIi8KClBsYXllckxpc3QSIQoHcGxheWVycxgBIAMoCzIQLkdhbWUu",
-            "UGxheWVySW5mbyILCglTdGFydEdhbWUidgoJR2FtZVN0YXJ0EhMKC3JhbmRv",
-            "bV9zZWVkGAEgASgFEhQKDHBsYXllcl9jb3VudBgCIAEoBRIVCg1nYW1lX2R1",
-            "cmF0aW9uGAMgASgCEhQKDHRhcmdldF9zY29yZRgEIAEoBRIRCgl0aWNrX3Jh",
-            "dGUYBSABKAUiiAEKC1BsYXllcklucHV0EhEKCXBsYXllcl9pZBgBIAEoBRIM",
-            "CgR0aWNrGAIgASgFEhAKCG1vdmVfZGlyGAMgASgNEg4KBmF0dGFjaxgEIAEo",
-            "CBINCgVza2lsbBgFIAEoCBISCgpjYW1lcmFfeWF3GAYgASgCEhMKC2NoYXJn",
-            "ZV90aW1lGAcgASgCIj0KCklucHV0RnJhbWUSDAoEdGljaxgBIAEoBRIhCgZp",
-            "bnB1dHMYAiADKAsyES5HYW1lLlBsYXllcklucHV0Ik8KDENyeXN0YWxTcGF3",
-            "bhISCgpjcnlzdGFsX2lkGAEgASgFEg0KBXBvc194GAIgASgCEg0KBXBvc195",
-            "GAMgASgCEg0KBXBvc196GAQgASgCIkkKDUNyeXN0YWxQaWNrdXASEgoKY3J5",
-            "c3RhbF9pZBgBIAEoBRIRCglwbGF5ZXJfaWQYAiABKAUSEQoJbmV3X3Njb3Jl",
-            "GAMgASgFIkoKCVBsYXllckhpdBITCgthdHRhY2tlcl9pZBgBIAEoBRIRCgl2",
-            "aWN0aW1faWQYAiABKAUSFQoNZHJvcHBlZF9jb3VudBgDIAEoBSI2CgpQbGF5",
-            "ZXJGYWxsEhEKCXBsYXllcl9pZBgBIAEoBRIVCg1kcm9wcGVkX2NvdW50GAIg",
-            "ASgFIiwKB0dhbWVFbmQSDgoGc2NvcmVzGAEgAygFEhEKCXdpbm5lcl9pZBgC",
-            "IAEoBSIxCglSZWNvbm5lY3QSEQoJcGxheWVyX2lkGAEgASgFEhEKCWxhc3Rf",
-            "dGljaxgCIAEoBSI2CgxSZWNvbm5lY3RBY2sSDwoHc3VjY2VzcxgBIAEoCBIV",
-            "Cg1jYXRjaF91cF9mcm9tGAIgASgFIlQKDUNhdGNoVVBGcmFtZXMSEQoJZnJv",
-            "bV90aWNrGAEgASgFEg8KB3RvX3RpY2sYAiABKAUSHwoFZnJhbXMYAyADKAsy",
-            "EC5HYW1lLklucHV0RnJhbWVCDKoCCUdhbWVQcm90b2IGcHJvdG8z"));
+            "Z2FtZV9zdGFydBgQIAEoCzIPLkdhbWUuR2FtZVN0YXJ0SAASJwoLcGxheWVy",
+            "X2luZm8YESABKAsyEC5HYW1lLlBsYXllckluZm9IABInCgtpbnB1dF9mcmFt",
+            "ZRgUIAEoCzIQLkdhbWUuSW5wdXRGcmFtZUgAEikKDHBsYXllcl9pbnB1dBgV",
+            "IAEoCzIRLkdhbWUuUGxheWVySW5wdXRIABIrCg1jcnlzdGFsX3NwYXduGB4g",
+            "ASgLMhIuR2FtZS5DcnlzdGFsU3Bhd25IABItCg5jcnlzdGFsX3BpY2t1cBgf",
+            "IAEoCzITLkdhbWUuQ3J5c3RhbFBpY2t1cEgAEiUKCnBsYXllcl9oaXQYICAB",
+            "KAsyDy5HYW1lLlBsYXllckhpdEgAEicKC3BsYXllcl9mYWxsGCEgASgLMhAu",
+            "R2FtZS5QbGF5ZXJGYWxsSAASIQoIZ2FtZV9lbmQYIiABKAsyDS5HYW1lLkdh",
+            "bWVFbmRIABIkCglyZWNvbm5lY3QYKCABKAsyDy5HYW1lLlJlY29ubmVjdEgA",
+            "EisKDXJlY29ubmVjdF9hY2sYKSABKAsyEi5HYW1lLlJlY29ubmVjdEFja0gA",
+            "Ei4KD2NhdGNoX3VwX2ZyYW1lcxgqIAEoCzITLkdhbWUuQ2F0Y2hVUEZyYW1l",
+            "c0gAQgUKA21zZyIZCglIZWFydEJlYXQSDAoEdGltZRgBIAEoAyIZCgdLaWNr",
+            "T2ZmEg4KBnJlYXNvbhgBIAEoCSIfCgpDcmVhdGVSb29tEhEKCWhvc3RfbmFt",
+            "ZRgBIAEoCSJTCg1DcmVhdGVSb29tQWNrEg8KB3N1Y2Nlc3MYASABKAgSDwoH",
+            "cm9vbV9pZBgCIAEoBRIRCglwbGF5ZXJfaWQYAyABKAUSDQoFZXJyb3IYBCAB",
+            "KAkiMAoISm9pblJvb20SDwoHcm9vbV9pZBgBIAEoBRITCgtwbGF5ZXJfbmFt",
+            "ZRgCIAEoCSJACgtKb2luUm9vbUFjaxIPCgdzdWNjZXNzGAEgASgIEhEKCXBs",
+            "YXllcl9pZBgCIAEoBRINCgVlcnJvchgDIAEoCSJFCgpQbGF5ZXJJbmZvEhEK",
+            "CXBsYXllcl9pZBgBIAEoBRITCgtwbGF5ZXJfbmFtZRgCIAEoCRIPCgdpc19o",
+            "b3N0GAMgASgIIi8KClBsYXllckxpc3QSIQoHcGxheWVycxgBIAMoCzIQLkdh",
+            "bWUuUGxheWVySW5mbyILCglTdGFydEdhbWUidgoJR2FtZVN0YXJ0EhMKC3Jh",
+            "bmRvbV9zZWVkGAEgASgFEhQKDHBsYXllcl9jb3VudBgCIAEoBRIVCg1nYW1l",
+            "X2R1cmF0aW9uGAMgASgCEhQKDHRhcmdldF9zY29yZRgEIAEoBRIRCgl0aWNr",
+            "X3JhdGUYBSABKAUiiAEKC1BsYXllcklucHV0EhEKCXBsYXllcl9pZBgBIAEo",
+            "BRIMCgR0aWNrGAIgASgFEhAKCG1vdmVfZGlyGAMgASgNEg4KBmF0dGFjaxgE",
+            "IAEoCBINCgVza2lsbBgFIAEoCBISCgpjYW1lcmFfeWF3GAYgASgCEhMKC2No",
+            "YXJnZV90aW1lGAcgASgCIj0KCklucHV0RnJhbWUSDAoEdGljaxgBIAEoBRIh",
+            "CgZpbnB1dHMYAiADKAsyES5HYW1lLlBsYXllcklucHV0Ik8KDENyeXN0YWxT",
+            "cGF3bhISCgpjcnlzdGFsX2lkGAEgASgFEg0KBXBvc194GAIgASgCEg0KBXBv",
+            "c195GAMgASgCEg0KBXBvc196GAQgASgCIkkKDUNyeXN0YWxQaWNrdXASEgoK",
+            "Y3J5c3RhbF9pZBgBIAEoBRIRCglwbGF5ZXJfaWQYAiABKAUSEQoJbmV3X3Nj",
+            "b3JlGAMgASgFIkoKCVBsYXllckhpdBITCgthdHRhY2tlcl9pZBgBIAEoBRIR",
+            "Cgl2aWN0aW1faWQYAiABKAUSFQoNZHJvcHBlZF9jb3VudBgDIAEoBSI2CgpQ",
+            "bGF5ZXJGYWxsEhEKCXBsYXllcl9pZBgBIAEoBRIVCg1kcm9wcGVkX2NvdW50",
+            "GAIgASgFIiwKB0dhbWVFbmQSDgoGc2NvcmVzGAEgAygFEhEKCXdpbm5lcl9p",
+            "ZBgCIAEoBSIxCglSZWNvbm5lY3QSEQoJcGxheWVyX2lkGAEgASgFEhEKCWxh",
+            "c3RfdGljaxgCIAEoBSI2CgxSZWNvbm5lY3RBY2sSDwoHc3VjY2VzcxgBIAEo",
+            "CBIVCg1jYXRjaF91cF9mcm9tGAIgASgFIlQKDUNhdGNoVVBGcmFtZXMSEQoJ",
+            "ZnJvbV90aWNrGAEgASgFEg8KB3RvX3RpY2sYAiABKAUSHwoFZnJhbXMYAyAD",
+            "KAsyEC5HYW1lLklucHV0RnJhbWVCDKoCCUdhbWVQcm90b2IGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.NetMessage), global::GameProto.NetMessage.Parser, new[]{ "Heartbeat", "KickOff", "CreateRoom", "CreateRoomAck", "JoinRoom", "JoinRoomAck", "PlayerList", "StartGame", "GameStart", "InputFrame", "PlayerInput", "CrystalSpawn", "CrystalPickup", "PlayerHit", "PlayerFall", "GameEnd", "Reconnect", "ReconnectAck", "CatchUpFrames" }, new[]{ "Msg" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.NetMessage), global::GameProto.NetMessage.Parser, new[]{ "Heartbeat", "KickOff", "CreateRoom", "CreateRoomAck", "JoinRoom", "JoinRoomAck", "PlayerList", "StartGame", "GameStart", "PlayerInfo", "InputFrame", "PlayerInput", "CrystalSpawn", "CrystalPickup", "PlayerHit", "PlayerFall", "GameEnd", "Reconnect", "ReconnectAck", "CatchUpFrames" }, new[]{ "Msg" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.HeartBeat), global::GameProto.HeartBeat.Parser, new[]{ "Time" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.KickOff), global::GameProto.KickOff.Parser, new[]{ "Reason" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.CreateRoom), global::GameProto.CreateRoom.Parser, new[]{ "HostName" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.CreateRoomAck), global::GameProto.CreateRoomAck.Parser, new[]{ "Success", "RoomId", "PlayerId", "Error" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.JoinRoom), global::GameProto.JoinRoom.Parser, new[]{ "RoomId", "PlayerName" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.JoinRoomAck), global::GameProto.JoinRoomAck.Parser, new[]{ "Success", "PlayerId", "Error" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerInfo), global::GameProto.PlayerInfo.Parser, new[]{ "PlayerId", "Name", "IsHost" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerInfo), global::GameProto.PlayerInfo.Parser, new[]{ "PlayerId", "PlayerName", "IsHost" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerList), global::GameProto.PlayerList.Parser, new[]{ "Players" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.StartGame), global::GameProto.StartGame.Parser, null, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.GameStart), global::GameProto.GameStart.Parser, new[]{ "RandomSeed", "PlayerCount", "GameDuration", "TargetScore", "TickRate" }, null, null, null, null),
@@ -163,6 +164,9 @@ namespace GameProto {
           break;
         case MsgOneofCase.GameStart:
           GameStart = other.GameStart.Clone();
+          break;
+        case MsgOneofCase.PlayerInfo:
+          PlayerInfo = other.PlayerInfo.Clone();
           break;
         case MsgOneofCase.InputFrame:
           InputFrame = other.InputFrame.Clone();
@@ -319,6 +323,18 @@ namespace GameProto {
       }
     }
 
+    /// <summary>Field number for the "player_info" field.</summary>
+    public const int PlayerInfoFieldNumber = 17;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GameProto.PlayerInfo PlayerInfo {
+      get { return msgCase_ == MsgOneofCase.PlayerInfo ? (global::GameProto.PlayerInfo) msg_ : null; }
+      set {
+        msg_ = value;
+        msgCase_ = value == null ? MsgOneofCase.None : MsgOneofCase.PlayerInfo;
+      }
+    }
+
     /// <summary>Field number for the "input_frame" field.</summary>
     public const int InputFrameFieldNumber = 20;
     /// <summary>
@@ -461,6 +477,7 @@ namespace GameProto {
       PlayerList = 14,
       StartGame = 15,
       GameStart = 16,
+      PlayerInfo = 17,
       InputFrame = 20,
       PlayerInput = 21,
       CrystalSpawn = 30,
@@ -510,6 +527,7 @@ namespace GameProto {
       if (!object.Equals(PlayerList, other.PlayerList)) return false;
       if (!object.Equals(StartGame, other.StartGame)) return false;
       if (!object.Equals(GameStart, other.GameStart)) return false;
+      if (!object.Equals(PlayerInfo, other.PlayerInfo)) return false;
       if (!object.Equals(InputFrame, other.InputFrame)) return false;
       if (!object.Equals(PlayerInput, other.PlayerInput)) return false;
       if (!object.Equals(CrystalSpawn, other.CrystalSpawn)) return false;
@@ -537,6 +555,7 @@ namespace GameProto {
       if (msgCase_ == MsgOneofCase.PlayerList) hash ^= PlayerList.GetHashCode();
       if (msgCase_ == MsgOneofCase.StartGame) hash ^= StartGame.GetHashCode();
       if (msgCase_ == MsgOneofCase.GameStart) hash ^= GameStart.GetHashCode();
+      if (msgCase_ == MsgOneofCase.PlayerInfo) hash ^= PlayerInfo.GetHashCode();
       if (msgCase_ == MsgOneofCase.InputFrame) hash ^= InputFrame.GetHashCode();
       if (msgCase_ == MsgOneofCase.PlayerInput) hash ^= PlayerInput.GetHashCode();
       if (msgCase_ == MsgOneofCase.CrystalSpawn) hash ^= CrystalSpawn.GetHashCode();
@@ -601,6 +620,10 @@ namespace GameProto {
       if (msgCase_ == MsgOneofCase.GameStart) {
         output.WriteRawTag(130, 1);
         output.WriteMessage(GameStart);
+      }
+      if (msgCase_ == MsgOneofCase.PlayerInfo) {
+        output.WriteRawTag(138, 1);
+        output.WriteMessage(PlayerInfo);
       }
       if (msgCase_ == MsgOneofCase.InputFrame) {
         output.WriteRawTag(162, 1);
@@ -688,6 +711,10 @@ namespace GameProto {
         output.WriteRawTag(130, 1);
         output.WriteMessage(GameStart);
       }
+      if (msgCase_ == MsgOneofCase.PlayerInfo) {
+        output.WriteRawTag(138, 1);
+        output.WriteMessage(PlayerInfo);
+      }
       if (msgCase_ == MsgOneofCase.InputFrame) {
         output.WriteRawTag(162, 1);
         output.WriteMessage(InputFrame);
@@ -764,6 +791,9 @@ namespace GameProto {
       }
       if (msgCase_ == MsgOneofCase.GameStart) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(GameStart);
+      }
+      if (msgCase_ == MsgOneofCase.PlayerInfo) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(PlayerInfo);
       }
       if (msgCase_ == MsgOneofCase.InputFrame) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(InputFrame);
@@ -861,6 +891,12 @@ namespace GameProto {
             GameStart = new global::GameProto.GameStart();
           }
           GameStart.MergeFrom(other.GameStart);
+          break;
+        case MsgOneofCase.PlayerInfo:
+          if (PlayerInfo == null) {
+            PlayerInfo = new global::GameProto.PlayerInfo();
+          }
+          PlayerInfo.MergeFrom(other.PlayerInfo);
           break;
         case MsgOneofCase.InputFrame:
           if (InputFrame == null) {
@@ -1022,6 +1058,15 @@ namespace GameProto {
             }
             input.ReadMessage(subBuilder);
             GameStart = subBuilder;
+            break;
+          }
+          case 138: {
+            global::GameProto.PlayerInfo subBuilder = new global::GameProto.PlayerInfo();
+            if (msgCase_ == MsgOneofCase.PlayerInfo) {
+              subBuilder.MergeFrom(PlayerInfo);
+            }
+            input.ReadMessage(subBuilder);
+            PlayerInfo = subBuilder;
             break;
           }
           case 162: {
@@ -1214,6 +1259,15 @@ namespace GameProto {
             GameStart = subBuilder;
             break;
           }
+          case 138: {
+            global::GameProto.PlayerInfo subBuilder = new global::GameProto.PlayerInfo();
+            if (msgCase_ == MsgOneofCase.PlayerInfo) {
+              subBuilder.MergeFrom(PlayerInfo);
+            }
+            input.ReadMessage(subBuilder);
+            PlayerInfo = subBuilder;
+            break;
+          }
           case 162: {
             global::GameProto.InputFrame subBuilder = new global::GameProto.InputFrame();
             if (msgCase_ == MsgOneofCase.InputFrame) {
@@ -1311,6 +1365,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 1
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class HeartBeat : pb::IMessage<HeartBeat>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -1509,6 +1566,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 2
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class KickOff : pb::IMessage<KickOff>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -1707,6 +1767,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 10
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class CreateRoom : pb::IMessage<CreateRoom>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -1905,6 +1968,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 11
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class CreateRoomAck : pb::IMessage<CreateRoomAck>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -2214,6 +2280,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 12
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class JoinRoom : pb::IMessage<JoinRoom>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -2449,6 +2518,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 13
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class JoinRoomAck : pb::IMessage<JoinRoomAck>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -2721,6 +2793,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 17
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class PlayerInfo : pb::IMessage<PlayerInfo>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -2757,7 +2832,7 @@ namespace GameProto {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public PlayerInfo(PlayerInfo other) : this() {
       playerId_ = other.playerId_;
-      name_ = other.name_;
+      playerName_ = other.playerName_;
       isHost_ = other.isHost_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
@@ -2780,15 +2855,15 @@ namespace GameProto {
       }
     }
 
-    /// <summary>Field number for the "name" field.</summary>
-    public const int NameFieldNumber = 2;
-    private string name_ = "";
+    /// <summary>Field number for the "player_name" field.</summary>
+    public const int PlayerNameFieldNumber = 2;
+    private string playerName_ = "";
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public string Name {
-      get { return name_; }
+    public string PlayerName {
+      get { return playerName_; }
       set {
-        name_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+        playerName_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -2820,7 +2895,7 @@ namespace GameProto {
         return true;
       }
       if (PlayerId != other.PlayerId) return false;
-      if (Name != other.Name) return false;
+      if (PlayerName != other.PlayerName) return false;
       if (IsHost != other.IsHost) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -2830,7 +2905,7 @@ namespace GameProto {
     public override int GetHashCode() {
       int hash = 1;
       if (PlayerId != 0) hash ^= PlayerId.GetHashCode();
-      if (Name.Length != 0) hash ^= Name.GetHashCode();
+      if (PlayerName.Length != 0) hash ^= PlayerName.GetHashCode();
       if (IsHost != false) hash ^= IsHost.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -2854,9 +2929,9 @@ namespace GameProto {
         output.WriteRawTag(8);
         output.WriteInt32(PlayerId);
       }
-      if (Name.Length != 0) {
+      if (PlayerName.Length != 0) {
         output.WriteRawTag(18);
-        output.WriteString(Name);
+        output.WriteString(PlayerName);
       }
       if (IsHost != false) {
         output.WriteRawTag(24);
@@ -2876,9 +2951,9 @@ namespace GameProto {
         output.WriteRawTag(8);
         output.WriteInt32(PlayerId);
       }
-      if (Name.Length != 0) {
+      if (PlayerName.Length != 0) {
         output.WriteRawTag(18);
-        output.WriteString(Name);
+        output.WriteString(PlayerName);
       }
       if (IsHost != false) {
         output.WriteRawTag(24);
@@ -2897,8 +2972,8 @@ namespace GameProto {
       if (PlayerId != 0) {
         size += 1 + pb::CodedOutputStream.ComputeInt32Size(PlayerId);
       }
-      if (Name.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeStringSize(Name);
+      if (PlayerName.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(PlayerName);
       }
       if (IsHost != false) {
         size += 1 + 1;
@@ -2918,8 +2993,8 @@ namespace GameProto {
       if (other.PlayerId != 0) {
         PlayerId = other.PlayerId;
       }
-      if (other.Name.Length != 0) {
-        Name = other.Name;
+      if (other.PlayerName.Length != 0) {
+        PlayerName = other.PlayerName;
       }
       if (other.IsHost != false) {
         IsHost = other.IsHost;
@@ -2948,7 +3023,7 @@ namespace GameProto {
             break;
           }
           case 18: {
-            Name = input.ReadString();
+            PlayerName = input.ReadString();
             break;
           }
           case 24: {
@@ -2979,7 +3054,7 @@ namespace GameProto {
             break;
           }
           case 18: {
-            Name = input.ReadString();
+            PlayerName = input.ReadString();
             break;
           }
           case 24: {
@@ -2993,6 +3068,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 14
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class PlayerList : pb::IMessage<PlayerList>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -3181,7 +3259,7 @@ namespace GameProto {
   }
 
   /// <summary>
-  /// 房主发的 无字段 就是一个信号
+  /// 15
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class StartGame : pb::IMessage<StartGame>
@@ -3344,6 +3422,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 16
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class GameStart : pb::IMessage<GameStart>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -3697,6 +3778,7 @@ namespace GameProto {
   }
 
   /// <summary>
+  /// 21
   /// 一帧里一个玩家的输入
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
@@ -4135,6 +4217,7 @@ namespace GameProto {
   }
 
   /// <summary>
+  /// 20
   /// Host广播： 一帧所有玩家的输入
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
@@ -4361,6 +4444,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 30
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class CrystalSpawn : pb::IMessage<CrystalSpawn>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -4670,6 +4756,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 31
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class CrystalPickup : pb::IMessage<CrystalPickup>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -4942,6 +5031,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 32
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class PlayerHit : pb::IMessage<PlayerHit>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -5217,6 +5309,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 33
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class PlayerFall : pb::IMessage<PlayerFall>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -5455,6 +5550,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 34
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class GameEnd : pb::IMessage<GameEnd>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -5684,6 +5782,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 40
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class Reconnect : pb::IMessage<Reconnect>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -5925,6 +6026,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 41
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class ReconnectAck : pb::IMessage<ReconnectAck>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -6166,6 +6270,9 @@ namespace GameProto {
 
   }
 
+  /// <summary>
+  /// 42
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class CatchUPFrames : pb::IMessage<CatchUPFrames>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE

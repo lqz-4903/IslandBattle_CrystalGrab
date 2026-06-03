@@ -42,7 +42,7 @@ public static class TaskExtensions
     /// SavePlayerDataAsync(playerData).Forget();
     /// 
     /// // 网络请求，出错也不影响主流程
-    /// _kcp.SendAsync(conv, data).Forget();
+    /// kcp.SendAsync(conv, data).Forget();
     /// </code>
     /// 
     /// 注意事项：

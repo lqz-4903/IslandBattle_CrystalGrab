@@ -67,6 +67,7 @@
     <Compile Include="Assets\Scripts\GameEntry.cs" />
     <Compile Include="Assets\XLua\Src\TemplateEngine\TemplateEngine.cs" />
     <Compile Include="Assets\XLua\Examples\06_Coroutine\CoroutineTest.cs" />
+    <Compile Include="Assets\Scripts\Logic\RoomHandler.cs" />
     <Compile Include="Assets\XLua\Src\ObjectCasters.cs" />
     <Compile Include="Assets\XLua\Examples\ExampleGenConfig.cs" />
     <Compile Include="Assets\XLua\Examples\06_Coroutine\Coroutine_Runner.cs" />
@@ -77,6 +78,7 @@
     <Compile Include="Assets\Scripts\Framework\Json\LitJson\Netstandard15Polyfill.cs" />
     <Compile Include="Assets\XLua\Tutorial\CSharpCallLua\CSCallLua.cs" />
     <Compile Include="Assets\XLua\Src\CopyByValue.cs" />
+    <Compile Include="Assets\Scripts\Logic\FrameExcutor.cs" />
     <Compile Include="Assets\XLua\Examples\07_AsyncTest\MessageBox.cs" />
     <Compile Include="Assets\XLua\Src\LuaDLL.cs" />
     <Compile Include="Assets\XLua\Src\LuaException.cs" />
@@ -102,14 +104,17 @@
     <Compile Include="Assets\Scripts\Framework\Json\JsonMgr.cs" />
     <Compile Include="Assets\XLua\Src\ObjectPool.cs" />
     <Compile Include="Assets\XLua\Src\RawObject.cs" />
+    <Compile Include="Assets\Scripts\Logic\HostServer.cs" />
     <Compile Include="Assets\Scripts\Framework\ProtobufTool\SerAndDeserPBTool.cs" />
     <Compile Include="Assets\XLua\Tutorial\LoadLuaScript\ByFile\ByFile.cs" />
     <Compile Include="Assets\XLua\Src\GenericDelegateBridge.cs" />
     <Compile Include="Assets\XLua\Examples\01_Helloworld\Helloworld.cs" />
     <Compile Include="Assets\XLua\Src\LuaFunction.cs" />
     <Compile Include="Assets\XLua\Src\LuaTable.cs" />
+    <Compile Include="Assets\Scripts\Logic\GameEventHandler.cs" />
     <Compile Include="Assets\Scripts\Framework\EventCenter\ThreadUtil.cs" />
     <Compile Include="Assets\XLua\Src\Utils.cs" />
+    <Compile Include="Assets\Scripts\Logic\FrameSyncHandler.cs" />
     <Compile Include="Assets\Scripts\Framework\Json\LitJson\JsonData.cs" />
     <Compile Include="Assets\XLua\Src\StaticLuaCallbacks.cs" />
     <Compile Include="Assets\Scripts\Framework\Json\LitJson\JsonException.cs" />
@@ -1050,50 +1055,6 @@
       <HintPath>D:\Unity\2022.3.62f3c1\Editor\Data\NetStandard\compat\2.1.0\shims\netfx\System.Xml.Serialization.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Unity.EditorCoroutines.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.EditorCoroutines.Editor.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Unity.Timeline.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.Timeline.Editor.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Unity.VisualScripting.Shared.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Shared.Editor.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Unity.VisualStudio.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.VisualStudio.Editor.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="UnityEditor.UI">
-      <HintPath>Library\ScriptAssemblies\UnityEditor.UI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Unity.VisualScripting.Core">
-      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Core.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="UnityEngine.UI">
-      <HintPath>Library\ScriptAssemblies\UnityEngine.UI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Unity.VisualScripting.Core.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Core.Editor.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Unity.Rider.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.Rider.Editor.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Unity.VisualScripting.Flow">
-      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Flow.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Unity.VisualScripting.Flow.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Flow.Editor.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="Unity.Timeline">
       <HintPath>Library\ScriptAssemblies\Unity.Timeline.dll</HintPath>
       <Private>False</Private>
@@ -1104,6 +1065,14 @@
     </Reference>
     <Reference Include="Unity.TestTools.CodeCoverage.Editor.OpenCover.Mono.Reflection">
       <HintPath>Library\ScriptAssemblies\Unity.TestTools.CodeCoverage.Editor.OpenCover.Mono.Reflection.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>Library\ScriptAssemblies\UnityEngine.UI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Unity.EditorCoroutines.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.EditorCoroutines.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.VisualScripting.SettingsProvider.Editor">
@@ -1130,16 +1099,44 @@
       <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.State.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Unity.Timeline.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.Timeline.Editor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Unity.Settings.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.Settings.Editor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Unity.VisualScripting.Shared.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Shared.Editor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Unity.VisualStudio.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.VisualStudio.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
       <HintPath>Library\ScriptAssemblies\Unity.TextMeshPro.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Unity.VisualScripting.Core">
+      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Unity.TextMeshPro.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.TextMeshPro.Editor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEditor.UI">
+      <HintPath>Library\ScriptAssemblies\UnityEditor.UI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Unity.VisualScripting.Core.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Core.Editor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Unity.Rider.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.Rider.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.VisualScripting.State">
@@ -1152,6 +1149,14 @@
     </Reference>
     <Reference Include="Unity.VSCode.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.VSCode.Editor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Unity.VisualScripting.Flow">
+      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Flow.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Unity.VisualScripting.Flow.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Flow.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
