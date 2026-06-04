@@ -24,7 +24,7 @@ namespace GameProto {
     static GameReflection() {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
-            "CgpnYW1lLnByb3RvEgRHYW1lIswGCgpOZXRNZXNzYWdlEiQKCWhlYXJ0YmVh",
+            "CgpnYW1lLnByb3RvEgRHYW1lIsgGCgpOZXRNZXNzYWdlEiQKCWhlYXJ0YmVh",
             "dBgBIAEoCzIPLkdhbWUuSGVhcnRCZWF0SAASIQoIa2lja19vZmYYAiABKAsy",
             "DS5HYW1lLktpY2tPZmZIABInCgtjcmVhdGVfcm9vbRgKIAEoCzIQLkdhbWUu",
             "Q3JlYXRlUm9vbUgAEi4KD2NyZWF0ZV9yb29tX2FjaxgLIAEoCzITLkdhbWUu",
@@ -33,51 +33,51 @@ namespace GameProto {
             "bUFja0gAEicKC3BsYXllcl9saXN0GA4gASgLMhAuR2FtZS5QbGF5ZXJMaXN0",
             "SAASJQoKc3RhcnRfZ2FtZRgPIAEoCzIPLkdhbWUuU3RhcnRHYW1lSAASJQoK",
             "Z2FtZV9zdGFydBgQIAEoCzIPLkdhbWUuR2FtZVN0YXJ0SAASJwoLcGxheWVy",
-            "X2luZm8YESABKAsyEC5HYW1lLlBsYXllckluZm9IABInCgtpbnB1dF9mcmFt",
-            "ZRgUIAEoCzIQLkdhbWUuSW5wdXRGcmFtZUgAEikKDHBsYXllcl9pbnB1dBgV",
-            "IAEoCzIRLkdhbWUuUGxheWVySW5wdXRIABIrCg1jcnlzdGFsX3NwYXduGB4g",
-            "ASgLMhIuR2FtZS5DcnlzdGFsU3Bhd25IABItCg5jcnlzdGFsX3BpY2t1cBgf",
-            "IAEoCzITLkdhbWUuQ3J5c3RhbFBpY2t1cEgAEiUKCnBsYXllcl9oaXQYICAB",
-            "KAsyDy5HYW1lLlBsYXllckhpdEgAEicKC3BsYXllcl9mYWxsGCEgASgLMhAu",
-            "R2FtZS5QbGF5ZXJGYWxsSAASIQoIZ2FtZV9lbmQYIiABKAsyDS5HYW1lLkdh",
-            "bWVFbmRIABIkCglyZWNvbm5lY3QYKCABKAsyDy5HYW1lLlJlY29ubmVjdEgA",
-            "EisKDXJlY29ubmVjdF9hY2sYKSABKAsyEi5HYW1lLlJlY29ubmVjdEFja0gA",
-            "Ei4KD2NhdGNoX3VwX2ZyYW1lcxgqIAEoCzITLkdhbWUuQ2F0Y2hVUEZyYW1l",
-            "c0gAQgUKA21zZyIZCglIZWFydEJlYXQSDAoEdGltZRgBIAEoAyIZCgdLaWNr",
-            "T2ZmEg4KBnJlYXNvbhgBIAEoCSIfCgpDcmVhdGVSb29tEhEKCWhvc3RfbmFt",
-            "ZRgBIAEoCSJTCg1DcmVhdGVSb29tQWNrEg8KB3N1Y2Nlc3MYASABKAgSDwoH",
-            "cm9vbV9pZBgCIAEoBRIRCglwbGF5ZXJfaWQYAyABKAUSDQoFZXJyb3IYBCAB",
-            "KAkiMAoISm9pblJvb20SDwoHcm9vbV9pZBgBIAEoCRITCgtwbGF5ZXJfbmFt",
-            "ZRgCIAEoCSJ0CgtKb2luUm9vbUFjaxIPCgdzdWNjZXNzGAEgASgIEhEKCXBs",
-            "YXllcl9pZBgCIAEoBRINCgVlcnJvchgDIAEoCRIPCgdyb29tX2lkGAQgASgJ",
-            "EiEKB3BsYXllcnMYBSADKAsyEC5HYW1lLlBsYXllckluZm8iRQoKUGxheWVy",
-            "SW5mbxIRCglwbGF5ZXJfaWQYASABKAUSEwoLcGxheWVyX25hbWUYAiABKAkS",
-            "DwoHaXNfaG9zdBgDIAEoCCIvCgpQbGF5ZXJMaXN0EiEKB3BsYXllcnMYASAD",
-            "KAsyEC5HYW1lLlBsYXllckluZm8iCwoJU3RhcnRHYW1lIncKCUdhbWVTdGFy",
-            "dBITCgtyYW5kb21fc2VlZBgBIAEoBRIUCgxwbGF5ZXJfY291bnQYAiABKAUS",
-            "FQoNZ2FtZV9kdXJhdGlvbhgDIAEoAhIUCgx0YXJnZXRfc2NvcmUYBCABKAUS",
-            "EgoKZnJhbWVfcmF0ZRgFIAEoBSKIAQoLUGxheWVySW5wdXQSEQoJcGxheWVy",
-            "X2lkGAEgASgFEgwKBHRpY2sYAiABKAUSEAoIbW92ZV9kaXIYAyABKA0SDgoG",
-            "YXR0YWNrGAQgASgIEg0KBXNraWxsGAUgASgIEhIKCmNhbWVyYV95YXcYBiAB",
-            "KAISEwoLY2hhcmdlX3RpbWUYByABKAIiPQoKSW5wdXRGcmFtZRIMCgR0aWNr",
-            "GAEgASgFEiEKBmlucHV0cxgCIAMoCzIRLkdhbWUuUGxheWVySW5wdXQiTwoM",
-            "Q3J5c3RhbFNwYXduEhIKCmNyeXN0YWxfaWQYASABKAUSDQoFcG9zX3gYAiAB",
-            "KAISDQoFcG9zX3kYAyABKAISDQoFcG9zX3oYBCABKAIiSQoNQ3J5c3RhbFBp",
-            "Y2t1cBISCgpjcnlzdGFsX2lkGAEgASgFEhEKCXBsYXllcl9pZBgCIAEoBRIR",
-            "CgluZXdfc2NvcmUYAyABKAUiSgoJUGxheWVySGl0EhMKC2F0dGFja2VyX2lk",
-            "GAEgASgFEhEKCXZpY3RpbV9pZBgCIAEoBRIVCg1kcm9wcGVkX2NvdW50GAMg",
-            "ASgFIjYKClBsYXllckZhbGwSEQoJcGxheWVyX2lkGAEgASgFEhUKDWRyb3Bw",
-            "ZWRfY291bnQYAiABKAUiLAoHR2FtZUVuZBIOCgZzY29yZXMYASADKAUSEQoJ",
-            "d2lubmVyX2lkGAIgASgFIjEKCVJlY29ubmVjdBIRCglwbGF5ZXJfaWQYASAB",
-            "KAUSEQoJbGFzdF90aWNrGAIgASgFIjYKDFJlY29ubmVjdEFjaxIPCgdzdWNj",
-            "ZXNzGAEgASgIEhUKDWNhdGNoX3VwX2Zyb20YAiABKAUiVAoNQ2F0Y2hVUEZy",
-            "YW1lcxIRCglmcm9tX3RpY2sYASABKAUSDwoHdG9fdGljaxgCIAEoBRIfCgVm",
-            "cmFtcxgDIAMoCzIQLkdhbWUuSW5wdXRGcmFtZUIMqgIJR2FtZVByb3RvYgZw",
-            "cm90bzM="));
+            "X2luZm8YESABKAsyEC5HYW1lLlBsYXllckluZm9IABIlCgppbnB1dF90aWNr",
+            "GBQgASgLMg8uR2FtZS5JbnB1dFRpY2tIABIpCgxwbGF5ZXJfaW5wdXQYFSAB",
+            "KAsyES5HYW1lLlBsYXllcklucHV0SAASKwoNY3J5c3RhbF9zcGF3bhgeIAEo",
+            "CzISLkdhbWUuQ3J5c3RhbFNwYXduSAASLQoOY3J5c3RhbF9waWNrdXAYHyAB",
+            "KAsyEy5HYW1lLkNyeXN0YWxQaWNrdXBIABIlCgpwbGF5ZXJfaGl0GCAgASgL",
+            "Mg8uR2FtZS5QbGF5ZXJIaXRIABInCgtwbGF5ZXJfZmFsbBghIAEoCzIQLkdh",
+            "bWUuUGxheWVyRmFsbEgAEiEKCGdhbWVfZW5kGCIgASgLMg0uR2FtZS5HYW1l",
+            "RW5kSAASJAoJcmVjb25uZWN0GCggASgLMg8uR2FtZS5SZWNvbm5lY3RIABIr",
+            "Cg1yZWNvbm5lY3RfYWNrGCkgASgLMhIuR2FtZS5SZWNvbm5lY3RBY2tIABIs",
+            "Cg5jYXRjaF91cF90aWNrcxgqIAEoCzISLkdhbWUuQ2F0Y2hVcFRpY2tzSABC",
+            "BQoDbXNnIhkKCUhlYXJ0QmVhdBIMCgR0aW1lGAEgASgDIhkKB0tpY2tPZmYS",
+            "DgoGcmVhc29uGAEgASgJIh8KCkNyZWF0ZVJvb20SEQoJaG9zdF9uYW1lGAEg",
+            "ASgJIlMKDUNyZWF0ZVJvb21BY2sSDwoHc3VjY2VzcxgBIAEoCBIPCgdyb29t",
+            "X2lkGAIgASgJEhEKCXBsYXllcl9pZBgDIAEoBRINCgVlcnJvchgEIAEoCSIw",
+            "CghKb2luUm9vbRIPCgdyb29tX2lkGAEgASgJEhMKC3BsYXllcl9uYW1lGAIg",
+            "ASgJInQKC0pvaW5Sb29tQWNrEg8KB3N1Y2Nlc3MYASABKAgSEQoJcGxheWVy",
+            "X2lkGAIgASgFEg0KBWVycm9yGAMgASgJEg8KB3Jvb21faWQYBCABKAkSIQoH",
+            "cGxheWVycxgFIAMoCzIQLkdhbWUuUGxheWVySW5mbyJFCgpQbGF5ZXJJbmZv",
+            "EhEKCXBsYXllcl9pZBgBIAEoBRITCgtwbGF5ZXJfbmFtZRgCIAEoCRIPCgdp",
+            "c19ob3N0GAMgASgIIi8KClBsYXllckxpc3QSIQoHcGxheWVycxgBIAMoCzIQ",
+            "LkdhbWUuUGxheWVySW5mbyILCglTdGFydEdhbWUidgoJR2FtZVN0YXJ0EhMK",
+            "C3JhbmRvbV9zZWVkGAEgASgFEhQKDHBsYXllcl9jb3VudBgCIAEoBRIVCg1n",
+            "YW1lX2R1cmF0aW9uGAMgASgCEhQKDHRhcmdldF9zY29yZRgEIAEoBRIRCgl0",
+            "aWNrX3JhdGUYBSABKAUiiAEKC1BsYXllcklucHV0EhEKCXBsYXllcl9pZBgB",
+            "IAEoBRIMCgR0aWNrGAIgASgFEhAKCG1vdmVfZGlyGAMgASgNEg4KBmF0dGFj",
+            "axgEIAEoCBINCgVza2lsbBgFIAEoCBISCgpjYW1lcmFfeWF3GAYgASgCEhMK",
+            "C2NoYXJnZV90aW1lGAcgASgCIjwKCUlucHV0VGljaxIMCgR0aWNrGAEgASgF",
+            "EiEKBmlucHV0cxgCIAMoCzIRLkdhbWUuUGxheWVySW5wdXQiTwoMQ3J5c3Rh",
+            "bFNwYXduEhIKCmNyeXN0YWxfaWQYASABKAUSDQoFcG9zX3gYAiABKAISDQoF",
+            "cG9zX3kYAyABKAISDQoFcG9zX3oYBCABKAIiSQoNQ3J5c3RhbFBpY2t1cBIS",
+            "CgpjcnlzdGFsX2lkGAEgASgFEhEKCXBsYXllcl9pZBgCIAEoBRIRCgluZXdf",
+            "c2NvcmUYAyABKAUiSgoJUGxheWVySGl0EhMKC2F0dGFja2VyX2lkGAEgASgF",
+            "EhEKCXZpY3RpbV9pZBgCIAEoBRIVCg1kcm9wcGVkX2NvdW50GAMgASgFIjYK",
+            "ClBsYXllckZhbGwSEQoJcGxheWVyX2lkGAEgASgFEhUKDWRyb3BwZWRfY291",
+            "bnQYAiABKAUiLAoHR2FtZUVuZBIOCgZzY29yZXMYASADKAUSEQoJd2lubmVy",
+            "X2lkGAIgASgFIjEKCVJlY29ubmVjdBIRCglwbGF5ZXJfaWQYASABKAUSEQoJ",
+            "bGFzdF90aWNrGAIgASgFIlMKDFJlY29ubmVjdEFjaxIPCgdzdWNjZXNzGAEg",
+            "ASgIEhUKDWNhdGNoX3VwX2Zyb20YAiABKAUSGwoTY3VycmVudF9zZXJ2ZXJf",
+            "dGljaxgDIAEoBSJSCgxDYXRjaFVwVGlja3MSEQoJZnJvbV90aWNrGAEgASgF",
+            "Eg8KB3RvX3RpY2sYAiABKAUSHgoFdGlja3MYAyADKAsyDy5HYW1lLklucHV0",
+            "VGlja0IMqgIJR2FtZVByb3RvYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.NetMessage), global::GameProto.NetMessage.Parser, new[]{ "Heartbeat", "KickOff", "CreateRoom", "CreateRoomAck", "JoinRoom", "JoinRoomAck", "PlayerList", "StartGame", "GameStart", "PlayerInfo", "InputFrame", "PlayerInput", "CrystalSpawn", "CrystalPickup", "PlayerHit", "PlayerFall", "GameEnd", "Reconnect", "ReconnectAck", "CatchUpFrames" }, new[]{ "Msg" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.NetMessage), global::GameProto.NetMessage.Parser, new[]{ "Heartbeat", "KickOff", "CreateRoom", "CreateRoomAck", "JoinRoom", "JoinRoomAck", "PlayerList", "StartGame", "GameStart", "PlayerInfo", "InputTick", "PlayerInput", "CrystalSpawn", "CrystalPickup", "PlayerHit", "PlayerFall", "GameEnd", "Reconnect", "ReconnectAck", "CatchUpTicks" }, new[]{ "Msg" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.HeartBeat), global::GameProto.HeartBeat.Parser, new[]{ "Time" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.KickOff), global::GameProto.KickOff.Parser, new[]{ "Reason" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.CreateRoom), global::GameProto.CreateRoom.Parser, new[]{ "HostName" }, null, null, null, null),
@@ -87,17 +87,17 @@ namespace GameProto {
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerInfo), global::GameProto.PlayerInfo.Parser, new[]{ "PlayerId", "PlayerName", "IsHost" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerList), global::GameProto.PlayerList.Parser, new[]{ "Players" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.StartGame), global::GameProto.StartGame.Parser, null, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.GameStart), global::GameProto.GameStart.Parser, new[]{ "RandomSeed", "PlayerCount", "GameDuration", "TargetScore", "FrameRate" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.GameStart), global::GameProto.GameStart.Parser, new[]{ "RandomSeed", "PlayerCount", "GameDuration", "TargetScore", "TickRate" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerInput), global::GameProto.PlayerInput.Parser, new[]{ "PlayerId", "Tick", "MoveDir", "Attack", "Skill", "CameraYaw", "ChargeTime" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.InputFrame), global::GameProto.InputFrame.Parser, new[]{ "Tick", "Inputs" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.InputTick), global::GameProto.InputTick.Parser, new[]{ "Tick", "Inputs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.CrystalSpawn), global::GameProto.CrystalSpawn.Parser, new[]{ "CrystalId", "PosX", "PosY", "PosZ" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.CrystalPickup), global::GameProto.CrystalPickup.Parser, new[]{ "CrystalId", "PlayerId", "NewScore" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerHit), global::GameProto.PlayerHit.Parser, new[]{ "AttackerId", "VictimId", "DroppedCount" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerFall), global::GameProto.PlayerFall.Parser, new[]{ "PlayerId", "DroppedCount" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.GameEnd), global::GameProto.GameEnd.Parser, new[]{ "Scores", "WinnerId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.Reconnect), global::GameProto.Reconnect.Parser, new[]{ "PlayerId", "LastTick" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.ReconnectAck), global::GameProto.ReconnectAck.Parser, new[]{ "Success", "CatchUpFrom" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.CatchUPFrames), global::GameProto.CatchUPFrames.Parser, new[]{ "FromTick", "ToTick", "Frams" }, null, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.ReconnectAck), global::GameProto.ReconnectAck.Parser, new[]{ "Success", "CatchUpFrom", "CurrentServerTick" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.CatchUpTicks), global::GameProto.CatchUpTicks.Parser, new[]{ "FromTick", "ToTick", "Ticks" }, null, null, null, null)
           }));
     }
     #endregion
@@ -170,8 +170,8 @@ namespace GameProto {
         case MsgOneofCase.PlayerInfo:
           PlayerInfo = other.PlayerInfo.Clone();
           break;
-        case MsgOneofCase.InputFrame:
-          InputFrame = other.InputFrame.Clone();
+        case MsgOneofCase.InputTick:
+          InputTick = other.InputTick.Clone();
           break;
         case MsgOneofCase.PlayerInput:
           PlayerInput = other.PlayerInput.Clone();
@@ -197,8 +197,8 @@ namespace GameProto {
         case MsgOneofCase.ReconnectAck:
           ReconnectAck = other.ReconnectAck.Clone();
           break;
-        case MsgOneofCase.CatchUpFrames:
-          CatchUpFrames = other.CatchUpFrames.Clone();
+        case MsgOneofCase.CatchUpTicks:
+          CatchUpTicks = other.CatchUpTicks.Clone();
           break;
       }
 
@@ -337,18 +337,18 @@ namespace GameProto {
       }
     }
 
-    /// <summary>Field number for the "input_frame" field.</summary>
-    public const int InputFrameFieldNumber = 20;
+    /// <summary>Field number for the "input_tick" field.</summary>
+    public const int InputTickFieldNumber = 20;
     /// <summary>
     /// 帧同步
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::GameProto.InputFrame InputFrame {
-      get { return msgCase_ == MsgOneofCase.InputFrame ? (global::GameProto.InputFrame) msg_ : null; }
+    public global::GameProto.InputTick InputTick {
+      get { return msgCase_ == MsgOneofCase.InputTick ? (global::GameProto.InputTick) msg_ : null; }
       set {
         msg_ = value;
-        msgCase_ = value == null ? MsgOneofCase.None : MsgOneofCase.InputFrame;
+        msgCase_ = value == null ? MsgOneofCase.None : MsgOneofCase.InputTick;
       }
     }
 
@@ -454,15 +454,15 @@ namespace GameProto {
       }
     }
 
-    /// <summary>Field number for the "catch_up_frames" field.</summary>
-    public const int CatchUpFramesFieldNumber = 42;
+    /// <summary>Field number for the "catch_up_ticks" field.</summary>
+    public const int CatchUpTicksFieldNumber = 42;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::GameProto.CatchUPFrames CatchUpFrames {
-      get { return msgCase_ == MsgOneofCase.CatchUpFrames ? (global::GameProto.CatchUPFrames) msg_ : null; }
+    public global::GameProto.CatchUpTicks CatchUpTicks {
+      get { return msgCase_ == MsgOneofCase.CatchUpTicks ? (global::GameProto.CatchUpTicks) msg_ : null; }
       set {
         msg_ = value;
-        msgCase_ = value == null ? MsgOneofCase.None : MsgOneofCase.CatchUpFrames;
+        msgCase_ = value == null ? MsgOneofCase.None : MsgOneofCase.CatchUpTicks;
       }
     }
 
@@ -480,7 +480,7 @@ namespace GameProto {
       StartGame = 15,
       GameStart = 16,
       PlayerInfo = 17,
-      InputFrame = 20,
+      InputTick = 20,
       PlayerInput = 21,
       CrystalSpawn = 30,
       CrystalPickup = 31,
@@ -489,7 +489,7 @@ namespace GameProto {
       GameEnd = 34,
       Reconnect = 40,
       ReconnectAck = 41,
-      CatchUpFrames = 42,
+      CatchUpTicks = 42,
     }
     private MsgOneofCase msgCase_ = MsgOneofCase.None;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -530,7 +530,7 @@ namespace GameProto {
       if (!object.Equals(StartGame, other.StartGame)) return false;
       if (!object.Equals(GameStart, other.GameStart)) return false;
       if (!object.Equals(PlayerInfo, other.PlayerInfo)) return false;
-      if (!object.Equals(InputFrame, other.InputFrame)) return false;
+      if (!object.Equals(InputTick, other.InputTick)) return false;
       if (!object.Equals(PlayerInput, other.PlayerInput)) return false;
       if (!object.Equals(CrystalSpawn, other.CrystalSpawn)) return false;
       if (!object.Equals(CrystalPickup, other.CrystalPickup)) return false;
@@ -539,7 +539,7 @@ namespace GameProto {
       if (!object.Equals(GameEnd, other.GameEnd)) return false;
       if (!object.Equals(Reconnect, other.Reconnect)) return false;
       if (!object.Equals(ReconnectAck, other.ReconnectAck)) return false;
-      if (!object.Equals(CatchUpFrames, other.CatchUpFrames)) return false;
+      if (!object.Equals(CatchUpTicks, other.CatchUpTicks)) return false;
       if (MsgCase != other.MsgCase) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -558,7 +558,7 @@ namespace GameProto {
       if (msgCase_ == MsgOneofCase.StartGame) hash ^= StartGame.GetHashCode();
       if (msgCase_ == MsgOneofCase.GameStart) hash ^= GameStart.GetHashCode();
       if (msgCase_ == MsgOneofCase.PlayerInfo) hash ^= PlayerInfo.GetHashCode();
-      if (msgCase_ == MsgOneofCase.InputFrame) hash ^= InputFrame.GetHashCode();
+      if (msgCase_ == MsgOneofCase.InputTick) hash ^= InputTick.GetHashCode();
       if (msgCase_ == MsgOneofCase.PlayerInput) hash ^= PlayerInput.GetHashCode();
       if (msgCase_ == MsgOneofCase.CrystalSpawn) hash ^= CrystalSpawn.GetHashCode();
       if (msgCase_ == MsgOneofCase.CrystalPickup) hash ^= CrystalPickup.GetHashCode();
@@ -567,7 +567,7 @@ namespace GameProto {
       if (msgCase_ == MsgOneofCase.GameEnd) hash ^= GameEnd.GetHashCode();
       if (msgCase_ == MsgOneofCase.Reconnect) hash ^= Reconnect.GetHashCode();
       if (msgCase_ == MsgOneofCase.ReconnectAck) hash ^= ReconnectAck.GetHashCode();
-      if (msgCase_ == MsgOneofCase.CatchUpFrames) hash ^= CatchUpFrames.GetHashCode();
+      if (msgCase_ == MsgOneofCase.CatchUpTicks) hash ^= CatchUpTicks.GetHashCode();
       hash ^= (int) msgCase_;
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -627,9 +627,9 @@ namespace GameProto {
         output.WriteRawTag(138, 1);
         output.WriteMessage(PlayerInfo);
       }
-      if (msgCase_ == MsgOneofCase.InputFrame) {
+      if (msgCase_ == MsgOneofCase.InputTick) {
         output.WriteRawTag(162, 1);
-        output.WriteMessage(InputFrame);
+        output.WriteMessage(InputTick);
       }
       if (msgCase_ == MsgOneofCase.PlayerInput) {
         output.WriteRawTag(170, 1);
@@ -663,9 +663,9 @@ namespace GameProto {
         output.WriteRawTag(202, 2);
         output.WriteMessage(ReconnectAck);
       }
-      if (msgCase_ == MsgOneofCase.CatchUpFrames) {
+      if (msgCase_ == MsgOneofCase.CatchUpTicks) {
         output.WriteRawTag(210, 2);
-        output.WriteMessage(CatchUpFrames);
+        output.WriteMessage(CatchUpTicks);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -717,9 +717,9 @@ namespace GameProto {
         output.WriteRawTag(138, 1);
         output.WriteMessage(PlayerInfo);
       }
-      if (msgCase_ == MsgOneofCase.InputFrame) {
+      if (msgCase_ == MsgOneofCase.InputTick) {
         output.WriteRawTag(162, 1);
-        output.WriteMessage(InputFrame);
+        output.WriteMessage(InputTick);
       }
       if (msgCase_ == MsgOneofCase.PlayerInput) {
         output.WriteRawTag(170, 1);
@@ -753,9 +753,9 @@ namespace GameProto {
         output.WriteRawTag(202, 2);
         output.WriteMessage(ReconnectAck);
       }
-      if (msgCase_ == MsgOneofCase.CatchUpFrames) {
+      if (msgCase_ == MsgOneofCase.CatchUpTicks) {
         output.WriteRawTag(210, 2);
-        output.WriteMessage(CatchUpFrames);
+        output.WriteMessage(CatchUpTicks);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -797,8 +797,8 @@ namespace GameProto {
       if (msgCase_ == MsgOneofCase.PlayerInfo) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(PlayerInfo);
       }
-      if (msgCase_ == MsgOneofCase.InputFrame) {
-        size += 2 + pb::CodedOutputStream.ComputeMessageSize(InputFrame);
+      if (msgCase_ == MsgOneofCase.InputTick) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(InputTick);
       }
       if (msgCase_ == MsgOneofCase.PlayerInput) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(PlayerInput);
@@ -824,8 +824,8 @@ namespace GameProto {
       if (msgCase_ == MsgOneofCase.ReconnectAck) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(ReconnectAck);
       }
-      if (msgCase_ == MsgOneofCase.CatchUpFrames) {
-        size += 2 + pb::CodedOutputStream.ComputeMessageSize(CatchUpFrames);
+      if (msgCase_ == MsgOneofCase.CatchUpTicks) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(CatchUpTicks);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -900,11 +900,11 @@ namespace GameProto {
           }
           PlayerInfo.MergeFrom(other.PlayerInfo);
           break;
-        case MsgOneofCase.InputFrame:
-          if (InputFrame == null) {
-            InputFrame = new global::GameProto.InputFrame();
+        case MsgOneofCase.InputTick:
+          if (InputTick == null) {
+            InputTick = new global::GameProto.InputTick();
           }
-          InputFrame.MergeFrom(other.InputFrame);
+          InputTick.MergeFrom(other.InputTick);
           break;
         case MsgOneofCase.PlayerInput:
           if (PlayerInput == null) {
@@ -954,11 +954,11 @@ namespace GameProto {
           }
           ReconnectAck.MergeFrom(other.ReconnectAck);
           break;
-        case MsgOneofCase.CatchUpFrames:
-          if (CatchUpFrames == null) {
-            CatchUpFrames = new global::GameProto.CatchUPFrames();
+        case MsgOneofCase.CatchUpTicks:
+          if (CatchUpTicks == null) {
+            CatchUpTicks = new global::GameProto.CatchUpTicks();
           }
-          CatchUpFrames.MergeFrom(other.CatchUpFrames);
+          CatchUpTicks.MergeFrom(other.CatchUpTicks);
           break;
       }
 
@@ -1072,12 +1072,12 @@ namespace GameProto {
             break;
           }
           case 162: {
-            global::GameProto.InputFrame subBuilder = new global::GameProto.InputFrame();
-            if (msgCase_ == MsgOneofCase.InputFrame) {
-              subBuilder.MergeFrom(InputFrame);
+            global::GameProto.InputTick subBuilder = new global::GameProto.InputTick();
+            if (msgCase_ == MsgOneofCase.InputTick) {
+              subBuilder.MergeFrom(InputTick);
             }
             input.ReadMessage(subBuilder);
-            InputFrame = subBuilder;
+            InputTick = subBuilder;
             break;
           }
           case 170: {
@@ -1153,12 +1153,12 @@ namespace GameProto {
             break;
           }
           case 338: {
-            global::GameProto.CatchUPFrames subBuilder = new global::GameProto.CatchUPFrames();
-            if (msgCase_ == MsgOneofCase.CatchUpFrames) {
-              subBuilder.MergeFrom(CatchUpFrames);
+            global::GameProto.CatchUpTicks subBuilder = new global::GameProto.CatchUpTicks();
+            if (msgCase_ == MsgOneofCase.CatchUpTicks) {
+              subBuilder.MergeFrom(CatchUpTicks);
             }
             input.ReadMessage(subBuilder);
-            CatchUpFrames = subBuilder;
+            CatchUpTicks = subBuilder;
             break;
           }
         }
@@ -1271,12 +1271,12 @@ namespace GameProto {
             break;
           }
           case 162: {
-            global::GameProto.InputFrame subBuilder = new global::GameProto.InputFrame();
-            if (msgCase_ == MsgOneofCase.InputFrame) {
-              subBuilder.MergeFrom(InputFrame);
+            global::GameProto.InputTick subBuilder = new global::GameProto.InputTick();
+            if (msgCase_ == MsgOneofCase.InputTick) {
+              subBuilder.MergeFrom(InputTick);
             }
             input.ReadMessage(subBuilder);
-            InputFrame = subBuilder;
+            InputTick = subBuilder;
             break;
           }
           case 170: {
@@ -1352,12 +1352,12 @@ namespace GameProto {
             break;
           }
           case 338: {
-            global::GameProto.CatchUPFrames subBuilder = new global::GameProto.CatchUPFrames();
-            if (msgCase_ == MsgOneofCase.CatchUpFrames) {
-              subBuilder.MergeFrom(CatchUpFrames);
+            global::GameProto.CatchUpTicks subBuilder = new global::GameProto.CatchUpTicks();
+            if (msgCase_ == MsgOneofCase.CatchUpTicks) {
+              subBuilder.MergeFrom(CatchUpTicks);
             }
             input.ReadMessage(subBuilder);
-            CatchUpFrames = subBuilder;
+            CatchUpTicks = subBuilder;
             break;
           }
         }
@@ -2035,13 +2035,13 @@ namespace GameProto {
 
     /// <summary>Field number for the "room_id" field.</summary>
     public const int RoomIdFieldNumber = 2;
-    private int roomId_;
+    private string roomId_ = "";
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public int RoomId {
+    public string RoomId {
       get { return roomId_; }
       set {
-        roomId_ = value;
+        roomId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -2096,7 +2096,7 @@ namespace GameProto {
     public override int GetHashCode() {
       int hash = 1;
       if (Success != false) hash ^= Success.GetHashCode();
-      if (RoomId != 0) hash ^= RoomId.GetHashCode();
+      if (RoomId.Length != 0) hash ^= RoomId.GetHashCode();
       if (PlayerId != 0) hash ^= PlayerId.GetHashCode();
       if (Error.Length != 0) hash ^= Error.GetHashCode();
       if (_unknownFields != null) {
@@ -2121,9 +2121,9 @@ namespace GameProto {
         output.WriteRawTag(8);
         output.WriteBool(Success);
       }
-      if (RoomId != 0) {
-        output.WriteRawTag(16);
-        output.WriteInt32(RoomId);
+      if (RoomId.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(RoomId);
       }
       if (PlayerId != 0) {
         output.WriteRawTag(24);
@@ -2147,9 +2147,9 @@ namespace GameProto {
         output.WriteRawTag(8);
         output.WriteBool(Success);
       }
-      if (RoomId != 0) {
-        output.WriteRawTag(16);
-        output.WriteInt32(RoomId);
+      if (RoomId.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(RoomId);
       }
       if (PlayerId != 0) {
         output.WriteRawTag(24);
@@ -2172,8 +2172,8 @@ namespace GameProto {
       if (Success != false) {
         size += 1 + 1;
       }
-      if (RoomId != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeInt32Size(RoomId);
+      if (RoomId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(RoomId);
       }
       if (PlayerId != 0) {
         size += 1 + pb::CodedOutputStream.ComputeInt32Size(PlayerId);
@@ -2196,7 +2196,7 @@ namespace GameProto {
       if (other.Success != false) {
         Success = other.Success;
       }
-      if (other.RoomId != 0) {
+      if (other.RoomId.Length != 0) {
         RoomId = other.RoomId;
       }
       if (other.PlayerId != 0) {
@@ -2228,8 +2228,8 @@ namespace GameProto {
             Success = input.ReadBool();
             break;
           }
-          case 16: {
-            RoomId = input.ReadInt32();
+          case 18: {
+            RoomId = input.ReadString();
             break;
           }
           case 24: {
@@ -2263,8 +2263,8 @@ namespace GameProto {
             Success = input.ReadBool();
             break;
           }
-          case 16: {
-            RoomId = input.ReadInt32();
+          case 18: {
+            RoomId = input.ReadString();
             break;
           }
           case 24: {
@@ -3324,7 +3324,7 @@ namespace GameProto {
   }
 
   /// <summary>
-  /// 15
+  /// 15 房主开始游戏
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class StartGame : pb::IMessage<StartGame>
@@ -3488,7 +3488,7 @@ namespace GameProto {
   }
 
   /// <summary>
-  /// 16
+  /// 16 游戏正式开始
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class GameStart : pb::IMessage<GameStart>
@@ -3529,7 +3529,7 @@ namespace GameProto {
       playerCount_ = other.playerCount_;
       gameDuration_ = other.gameDuration_;
       targetScore_ = other.targetScore_;
-      frameRate_ = other.frameRate_;
+      tickRate_ = other.tickRate_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -3590,18 +3590,18 @@ namespace GameProto {
       }
     }
 
-    /// <summary>Field number for the "frame_rate" field.</summary>
-    public const int FrameRateFieldNumber = 5;
-    private int frameRate_;
+    /// <summary>Field number for the "tick_rate" field.</summary>
+    public const int TickRateFieldNumber = 5;
+    private int tickRate_;
     /// <summary>
     /// 20
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public int FrameRate {
-      get { return frameRate_; }
+    public int TickRate {
+      get { return tickRate_; }
       set {
-        frameRate_ = value;
+        tickRate_ = value;
       }
     }
 
@@ -3624,7 +3624,7 @@ namespace GameProto {
       if (PlayerCount != other.PlayerCount) return false;
       if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(GameDuration, other.GameDuration)) return false;
       if (TargetScore != other.TargetScore) return false;
-      if (FrameRate != other.FrameRate) return false;
+      if (TickRate != other.TickRate) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -3636,7 +3636,7 @@ namespace GameProto {
       if (PlayerCount != 0) hash ^= PlayerCount.GetHashCode();
       if (GameDuration != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(GameDuration);
       if (TargetScore != 0) hash ^= TargetScore.GetHashCode();
-      if (FrameRate != 0) hash ^= FrameRate.GetHashCode();
+      if (TickRate != 0) hash ^= TickRate.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -3671,9 +3671,9 @@ namespace GameProto {
         output.WriteRawTag(32);
         output.WriteInt32(TargetScore);
       }
-      if (FrameRate != 0) {
+      if (TickRate != 0) {
         output.WriteRawTag(40);
-        output.WriteInt32(FrameRate);
+        output.WriteInt32(TickRate);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -3701,9 +3701,9 @@ namespace GameProto {
         output.WriteRawTag(32);
         output.WriteInt32(TargetScore);
       }
-      if (FrameRate != 0) {
+      if (TickRate != 0) {
         output.WriteRawTag(40);
-        output.WriteInt32(FrameRate);
+        output.WriteInt32(TickRate);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -3727,8 +3727,8 @@ namespace GameProto {
       if (TargetScore != 0) {
         size += 1 + pb::CodedOutputStream.ComputeInt32Size(TargetScore);
       }
-      if (FrameRate != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeInt32Size(FrameRate);
+      if (TickRate != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeInt32Size(TickRate);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -3754,8 +3754,8 @@ namespace GameProto {
       if (other.TargetScore != 0) {
         TargetScore = other.TargetScore;
       }
-      if (other.FrameRate != 0) {
-        FrameRate = other.FrameRate;
+      if (other.TickRate != 0) {
+        TickRate = other.TickRate;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -3793,7 +3793,7 @@ namespace GameProto {
             break;
           }
           case 40: {
-            FrameRate = input.ReadInt32();
+            TickRate = input.ReadInt32();
             break;
           }
         }
@@ -3832,7 +3832,7 @@ namespace GameProto {
             break;
           }
           case 40: {
-            FrameRate = input.ReadInt32();
+            TickRate = input.ReadInt32();
             break;
           }
         }
@@ -3844,7 +3844,7 @@ namespace GameProto {
 
   /// <summary>
   /// 21
-  /// 一帧里一个玩家的输入
+  /// 一个玩家在一帧里输入
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class PlayerInput : pb::IMessage<PlayerInput>
@@ -4286,16 +4286,16 @@ namespace GameProto {
   /// Host广播： 一帧所有玩家的输入
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class InputFrame : pb::IMessage<InputFrame>
+  public sealed partial class InputTick : pb::IMessage<InputTick>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<InputFrame> _parser = new pb::MessageParser<InputFrame>(() => new InputFrame());
+    private static readonly pb::MessageParser<InputTick> _parser = new pb::MessageParser<InputTick>(() => new InputTick());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<InputFrame> Parser { get { return _parser; } }
+    public static pb::MessageParser<InputTick> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -4311,7 +4311,7 @@ namespace GameProto {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public InputFrame() {
+    public InputTick() {
       OnConstruction();
     }
 
@@ -4319,7 +4319,7 @@ namespace GameProto {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public InputFrame(InputFrame other) : this() {
+    public InputTick(InputTick other) : this() {
       tick_ = other.tick_;
       inputs_ = other.inputs_.Clone();
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -4327,8 +4327,8 @@ namespace GameProto {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public InputFrame Clone() {
-      return new InputFrame(this);
+    public InputTick Clone() {
+      return new InputTick(this);
     }
 
     /// <summary>Field number for the "tick" field.</summary>
@@ -4357,12 +4357,12 @@ namespace GameProto {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as InputFrame);
+      return Equals(other as InputTick);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(InputFrame other) {
+    public bool Equals(InputTick other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -4440,7 +4440,7 @@ namespace GameProto {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(InputFrame other) {
+    public void MergeFrom(InputTick other) {
       if (other == null) {
         return;
       }
@@ -6131,6 +6131,7 @@ namespace GameProto {
     public ReconnectAck(ReconnectAck other) : this() {
       success_ = other.success_;
       catchUpFrom_ = other.catchUpFrom_;
+      currentServerTick_ = other.currentServerTick_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -6170,6 +6171,21 @@ namespace GameProto {
       }
     }
 
+    /// <summary>Field number for the "current_server_tick" field.</summary>
+    public const int CurrentServerTickFieldNumber = 3;
+    private int currentServerTick_;
+    /// <summary>
+    /// 服务端当前最新帧
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CurrentServerTick {
+      get { return currentServerTick_; }
+      set {
+        currentServerTick_ = value;
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -6187,6 +6203,7 @@ namespace GameProto {
       }
       if (Success != other.Success) return false;
       if (CatchUpFrom != other.CatchUpFrom) return false;
+      if (CurrentServerTick != other.CurrentServerTick) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -6196,6 +6213,7 @@ namespace GameProto {
       int hash = 1;
       if (Success != false) hash ^= Success.GetHashCode();
       if (CatchUpFrom != 0) hash ^= CatchUpFrom.GetHashCode();
+      if (CurrentServerTick != 0) hash ^= CurrentServerTick.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -6222,6 +6240,10 @@ namespace GameProto {
         output.WriteRawTag(16);
         output.WriteInt32(CatchUpFrom);
       }
+      if (CurrentServerTick != 0) {
+        output.WriteRawTag(24);
+        output.WriteInt32(CurrentServerTick);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -6240,6 +6262,10 @@ namespace GameProto {
         output.WriteRawTag(16);
         output.WriteInt32(CatchUpFrom);
       }
+      if (CurrentServerTick != 0) {
+        output.WriteRawTag(24);
+        output.WriteInt32(CurrentServerTick);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -6255,6 +6281,9 @@ namespace GameProto {
       }
       if (CatchUpFrom != 0) {
         size += 1 + pb::CodedOutputStream.ComputeInt32Size(CatchUpFrom);
+      }
+      if (CurrentServerTick != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeInt32Size(CurrentServerTick);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -6273,6 +6302,9 @@ namespace GameProto {
       }
       if (other.CatchUpFrom != 0) {
         CatchUpFrom = other.CatchUpFrom;
+      }
+      if (other.CurrentServerTick != 0) {
+        CurrentServerTick = other.CurrentServerTick;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -6299,6 +6331,10 @@ namespace GameProto {
           }
           case 16: {
             CatchUpFrom = input.ReadInt32();
+            break;
+          }
+          case 24: {
+            CurrentServerTick = input.ReadInt32();
             break;
           }
         }
@@ -6328,6 +6364,10 @@ namespace GameProto {
             CatchUpFrom = input.ReadInt32();
             break;
           }
+          case 24: {
+            CurrentServerTick = input.ReadInt32();
+            break;
+          }
         }
       }
     }
@@ -6339,16 +6379,16 @@ namespace GameProto {
   /// 42
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class CatchUPFrames : pb::IMessage<CatchUPFrames>
+  public sealed partial class CatchUpTicks : pb::IMessage<CatchUpTicks>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<CatchUPFrames> _parser = new pb::MessageParser<CatchUPFrames>(() => new CatchUPFrames());
+    private static readonly pb::MessageParser<CatchUpTicks> _parser = new pb::MessageParser<CatchUpTicks>(() => new CatchUpTicks());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<CatchUPFrames> Parser { get { return _parser; } }
+    public static pb::MessageParser<CatchUpTicks> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6364,7 +6404,7 @@ namespace GameProto {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public CatchUPFrames() {
+    public CatchUpTicks() {
       OnConstruction();
     }
 
@@ -6372,17 +6412,17 @@ namespace GameProto {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public CatchUPFrames(CatchUPFrames other) : this() {
+    public CatchUpTicks(CatchUpTicks other) : this() {
       fromTick_ = other.fromTick_;
       toTick_ = other.toTick_;
-      frams_ = other.frams_.Clone();
+      ticks_ = other.ticks_.Clone();
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public CatchUPFrames Clone() {
-      return new CatchUPFrames(this);
+    public CatchUpTicks Clone() {
+      return new CatchUpTicks(this);
     }
 
     /// <summary>Field number for the "from_tick" field.</summary>
@@ -6415,29 +6455,29 @@ namespace GameProto {
       }
     }
 
-    /// <summary>Field number for the "frams" field.</summary>
-    public const int FramsFieldNumber = 3;
-    private static readonly pb::FieldCodec<global::GameProto.InputFrame> _repeated_frams_codec
-        = pb::FieldCodec.ForMessage(26, global::GameProto.InputFrame.Parser);
-    private readonly pbc::RepeatedField<global::GameProto.InputFrame> frams_ = new pbc::RepeatedField<global::GameProto.InputFrame>();
+    /// <summary>Field number for the "ticks" field.</summary>
+    public const int TicksFieldNumber = 3;
+    private static readonly pb::FieldCodec<global::GameProto.InputTick> _repeated_ticks_codec
+        = pb::FieldCodec.ForMessage(26, global::GameProto.InputTick.Parser);
+    private readonly pbc::RepeatedField<global::GameProto.InputTick> ticks_ = new pbc::RepeatedField<global::GameProto.InputTick>();
     /// <summary>
     /// 这段时间所有玩家的输入帧
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<global::GameProto.InputFrame> Frams {
-      get { return frams_; }
+    public pbc::RepeatedField<global::GameProto.InputTick> Ticks {
+      get { return ticks_; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as CatchUPFrames);
+      return Equals(other as CatchUpTicks);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(CatchUPFrames other) {
+    public bool Equals(CatchUpTicks other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -6446,7 +6486,7 @@ namespace GameProto {
       }
       if (FromTick != other.FromTick) return false;
       if (ToTick != other.ToTick) return false;
-      if(!frams_.Equals(other.frams_)) return false;
+      if(!ticks_.Equals(other.ticks_)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -6456,7 +6496,7 @@ namespace GameProto {
       int hash = 1;
       if (FromTick != 0) hash ^= FromTick.GetHashCode();
       if (ToTick != 0) hash ^= ToTick.GetHashCode();
-      hash ^= frams_.GetHashCode();
+      hash ^= ticks_.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -6483,7 +6523,7 @@ namespace GameProto {
         output.WriteRawTag(16);
         output.WriteInt32(ToTick);
       }
-      frams_.WriteTo(output, _repeated_frams_codec);
+      ticks_.WriteTo(output, _repeated_ticks_codec);
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -6502,7 +6542,7 @@ namespace GameProto {
         output.WriteRawTag(16);
         output.WriteInt32(ToTick);
       }
-      frams_.WriteTo(ref output, _repeated_frams_codec);
+      ticks_.WriteTo(ref output, _repeated_ticks_codec);
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -6519,7 +6559,7 @@ namespace GameProto {
       if (ToTick != 0) {
         size += 1 + pb::CodedOutputStream.ComputeInt32Size(ToTick);
       }
-      size += frams_.CalculateSize(_repeated_frams_codec);
+      size += ticks_.CalculateSize(_repeated_ticks_codec);
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
       }
@@ -6528,7 +6568,7 @@ namespace GameProto {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(CatchUPFrames other) {
+    public void MergeFrom(CatchUpTicks other) {
       if (other == null) {
         return;
       }
@@ -6538,7 +6578,7 @@ namespace GameProto {
       if (other.ToTick != 0) {
         ToTick = other.ToTick;
       }
-      frams_.Add(other.frams_);
+      ticks_.Add(other.ticks_);
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -6567,7 +6607,7 @@ namespace GameProto {
             break;
           }
           case 26: {
-            frams_.AddEntriesFrom(input, _repeated_frams_codec);
+            ticks_.AddEntriesFrom(input, _repeated_ticks_codec);
             break;
           }
         }
@@ -6598,7 +6638,7 @@ namespace GameProto {
             break;
           }
           case 26: {
-            frams_.AddEntriesFrom(ref input, _repeated_frams_codec);
+            ticks_.AddEntriesFrom(ref input, _repeated_ticks_codec);
             break;
           }
         }

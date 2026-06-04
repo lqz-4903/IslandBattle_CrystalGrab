@@ -20,6 +20,8 @@ Dictionary = CS.System.Collections.Generic.Dictionary
 
 -- UI
 UI = CS.UnityEngine.UI
+Canvas = CS.UnityEngine.Canvas
+CanvasGroup = CS.UnityEngine.CanvasGroup
 UIBehaviour = CS.UnityEngine.EventSystems.UIBehaviour
 RectTransform = CS.UnityEngine.RectTransform
 Image = CS.UnityEngine.UI.Image
@@ -35,12 +37,15 @@ SpriteAtlas = CS.UnityEngine.U2D.SpriteAtlas
 -- Coroutine
 WaitForSeconds = CS.UnityEngine.WaitForSeconds
 
+-- Math
+Mathf = CS.UnityEngine.Mathf
+
 -- XLua
 -- xlua提供的一个工具表 一定要通过require引用
 util = require("xlua.util")
 
 -- Canvas 对于我们这个项目来说 是找一次就可以了
-Canvas = GameObject.Find("Canvas").transform
+-- Canvas = GameObject.Find("Canvas").transform
 
 
 

@@ -1,0 +1,395 @@
+using GameProto;
+using Google.Protobuf;
+using System;
+using UnityEngine;
+
+/// <summary>
+/// ═══════════════════════════════════════════════════════════════
+///     HostServer —— 主机服务器协调器（单例 MonoBehaviour）
+/// ═══════════════════════════════════════════════════════════════
+///
+/// 【定位】
+///   游戏主机的核心协调组件，管理整个游戏生命周期。
+///   持有各子处理器，负责事件注册/路由、消息收发、游戏状态管理。
+///
+/// 【架构】
+///   HostServer (MonoBehaviour 单例)
+///   ├── RoomHandler      —— 房间管理
+///   ├── FrameSyncHandler —— 帧同步（服务端）
+///   ├── GameEventHandler —— 游戏事件处理
+///   └── FrameExecutor    —— 帧执行（客户端侧，MonoBehaviour）
+///
+/// 【生命周期】
+///   1. CreateRoom  → 初始化 KcpMgr 服务器，创建房间
+///   2. JoinRoom    → 等待玩家加入
+///   3. StartGame   → 启动帧同步循环
+///   4. 游戏中      → 收集输入、分发帧、处理事件
+///   5. GameEnd     → 结算，停止帧同步
+/// ═══════════════════════════════════════════════════════════════
+/// </summary>
+public class HostServer : MonoBehaviour
+{
+    #region ==================== 单例 ====================
+
+    private static HostServer _instance;
+    public static HostServer Instance => _instance;
+
+    #endregion
+
+    #region ==================== 子处理器 ====================
+
+    private RoomHandler _roomHandler;
+    private FrameSyncHandler _frameSyncHandler;
+    private GameEventHandler _gameEventHandler;
+    private FrameExecutor _frameExecutor;
+
+    #endregion
+
+    #region ==================== 状态 ====================
+
+    /// <summary>服务器是否正在运行</summary>
+    private bool _isRunning;
+    public bool IsRunning => _isRunning;
+
+    /// <summary>游戏是否已开始</summary>
+    private bool _isGameStarted;
+    public bool IsGameStarted => _isGameStarted;
+
+    /// <summary>当前房间数据（由 RoomHandler 管理）</summary>
+    public RoomData CurrentRoom { get; set; }
+
+    /// <summary>默认端口</summary>
+    private const int DEFAULT_PORT = 8888;
+
+    #endregion
+
+    #region ==================== 生命周期 ====================
+
+    private void Awake()
+    {
+        _instance = this;
+
+        _roomHandler = new RoomHandler(this);
+        _frameSyncHandler = new FrameSyncHandler(this);
+        _gameEventHandler = new GameEventHandler(this);
+
+        _frameExecutor = GetComponent<FrameExecutor>();
+        if (_frameExecutor == null)
+            _frameExecutor = gameObject.AddComponent<FrameExecutor>();
+    }
+
+    private void Start()
+    {
+        RegisterEvents();
+    }
+
+    private void Update()
+    {
+        if (!_isRunning || !_isGameStarted) return;
+
+        _frameSyncHandler.Tick(Time.deltaTime);
+        _gameEventHandler.Tick(Time.deltaTime);
+    }
+
+    private void OnDestroy()
+    {
+        UnregisterEvents();
+        Shutdown();
+    }
+
+    #endregion
+
+    #region ==================== 启动 / 关闭 ====================
+
+    /// <summary>
+    /// 以主机模式启动（服务器 + 本地玩家）
+    /// UI 层调用此方法创建房间
+    /// </summary>
+    /// <param name="hostPlayerName">主机玩家名称</param>
+    /// <param name="port">监听端口</param>
+    public async void StartHost(string hostPlayerName, int port = DEFAULT_PORT)
+    {
+        if (_isRunning)
+        {
+            Debug.Log("【HostServer】已在运行中");
+            return;
+        }
+
+        try
+        {
+            // 1. 启动 KCP 服务器
+            await KcpMgr.Instance.StartAsServerAsync(port);
+            _isRunning = true;
+
+            // 2. 注册 KcpMgr 连接/断开回调
+            KcpMgr.Instance.OnClientConnected = OnClientConnected;
+            KcpMgr.Instance.OnClientDisconnected = OnClientDisconnected;
+
+            // 3. 创建房间
+            _roomHandler.CreateLocalRoom(hostPlayerName);
+
+            // 4. 初始化帧执行器（主机模式）
+            _frameExecutor.Init(isHost: true);
+
+            Debug.Log("【HostServer】主机启动成功，端口：" + port);
+        }
+        catch (Exception e)
+        {
+            Debug.Log("【HostServer】启动失败：" + e.Message);
+        }
+    }
+
+    /// <summary>
+    /// 关闭主机，释放所有资源
+    /// </summary>
+    public async void Shutdown()
+    {
+        if (!_isRunning) return;
+
+        _isGameStarted = false;
+        _isRunning = false;
+
+        _frameSyncHandler.Stop();
+        _gameEventHandler.Stop();
+
+        await KcpMgr.Instance.StopAsync();
+
+        CurrentRoom = null;
+        Debug.Log("【HostServer】主机已关闭");
+    }
+
+    #endregion
+
+    #region ==================== 事件注册 / 路由 ====================
+private void RegisterEvents()
+{
+    // ── 房间消息 ──
+    EventCenter.AddListener(10, OnCreateRoom);
+    EventCenter.AddListener(12, OnJoinRoom);
+    EventCenter.AddListener(16, OnGameStart);
+
+    // ── 帧同步消息 ──
+    EventCenter.AddListener(21, OnPlayerInput);
+
+    // ── 游戏事件消息 ──
+    EventCenter.AddListener(31, OnCrystalPickup);
+    EventCenter.AddListener(32, OnPlayerHit);
+    EventCenter.AddListener(33, OnPlayerFall);
+
+    // ── 重连消息 ──
+    EventCenter.AddListener(40, OnReconnect);
+
+    // ── 心跳 ──
+    EventCenter.AddListener(1, OnHeartbeat);
+}
+
+private void UnregisterEvents()
+{
+    EventCenter.RemoveListener(10, OnCreateRoom);
+    EventCenter.RemoveListener(12, OnJoinRoom);
+    EventCenter.RemoveListener(16, OnGameStart);
+    EventCenter.RemoveListener(21, OnPlayerInput);
+    EventCenter.RemoveListener(31, OnCrystalPickup);
+    EventCenter.RemoveListener(32, OnPlayerHit);
+    EventCenter.RemoveListener(33, OnPlayerFall);
+    EventCenter.RemoveListener(40, OnReconnect);
+    EventCenter.RemoveListener(1, OnHeartbeat);
+}
+
+// ── 房间 ──
+
+private void OnCreateRoom(uint conv, IMessage msg)
+{
+    if (!_isRunning) return;
+    _roomHandler.HandleCreateRoom(conv, msg as CreateRoom);
+}
+
+private void OnJoinRoom(uint conv, IMessage msg)
+{
+    if (!_isRunning) return;
+    _roomHandler.HandleJoinRoom(conv, msg as JoinRoom);
+}
+
+private void OnStartGame(uint conv, IMessage msg)
+{
+    if (!_isRunning || _isGameStarted) return;
+    _roomHandler.HandleStartGame(msg as StartGame);
+}
+
+// ── 帧同步 ──
+
+private void OnPlayerInput(uint conv, IMessage msg)
+{
+    if (!_isRunning || !_isGameStarted) return;
+    _frameSyncHandler.HandlePlayerInput(msg as PlayerInput);
+}
+
+// ── 游戏事件 ──
+
+private void OnCrystalPickup(uint conv, IMessage msg)
+{
+    if (!_isRunning || !_isGameStarted) return;
+    _gameEventHandler.HandleCrystalPickup(msg as CrystalPickup);
+}
+
+private void OnPlayerHit(uint conv, IMessage msg)
+{
+    if (!_isRunning || !_isGameStarted) return;
+    _gameEventHandler.HandlePlayerHit(msg as PlayerHit);
+}
+
+private void OnPlayerFall(uint conv, IMessage msg)
+{
+    if (!_isRunning || !_isGameStarted) return;
+    _gameEventHandler.HandlePlayerFall(msg as PlayerFall);
+}
+
+// ── 重连 ──
+
+private void OnReconnect(uint conv, IMessage msg)
+{
+    if (!_isRunning) return;
+
+    _roomHandler.HandleReconnect(conv, request.PlayerId);
+
+    _frameSyncHandler.HandleReconnect(conv, msg as Reconnect);
+}
+
+// ── 心跳 ──
+
+private void OnHeartbeat(uint conv, IMessage msg)
+{
+    // 服务端收到心跳后原样回发
+}
+
+    #endregion
+
+    #region ==================== KcpMgr 连接回调 ====================
+
+    private void OnClientConnected(uint conv)
+    {
+        Debug.Log("【HostServer】新客户端连接 Conv：" + conv);
+    }
+
+    private void OnClientDisconnected(uint conv, string reason)
+    {
+        Debug.Log("【HostServer】客户端断开 Conv：" + conv + " 原因：" + reason);
+
+        // 从房间移除
+        _roomHandler.HandlePlayerDisconnect(conv);
+
+        // 从帧同步中移除
+        if (_isGameStarted)
+        {
+            int playerId = _roomHandler.GetPlayerIdByConv(conv);
+            if (playerId > 0)
+                _frameSyncHandler.RemovePlayer(playerId);
+        }
+    }
+
+    #endregion
+
+    #region ==================== 游戏状态管理 ====================
+
+    /// <summary>
+    /// 由 RoomHandler 调用，标记游戏开始
+    /// </summary>
+    public void OnGameStarted()
+    {
+        _isGameStarted = true;
+
+        // 将玩家集合传给帧同步和游戏事件处理器
+        var playerIds = CurrentRoom.GetAllPlayerIds();
+        _frameSyncHandler.StartFrameLoop(playerIds);
+        _gameEventHandler.StartGameLoop();
+
+        Debug.Log("【HostServer】游戏开始，玩家数：" + playerIds.Length);
+    }
+
+    /// <summary>
+    /// 由 GameEventHandler 调用，标记游戏结束
+    /// </summary>
+    public void OnGameEnded()
+    {
+        _isGameStarted = false;
+        _frameSyncHandler.Stop();
+        _gameEventHandler.Stop();
+        Debug.Log("【HostServer】游戏结束");
+    }
+
+    #endregion
+
+    #region ==================== 主机玩家输入 ====================
+
+    /// <summary>
+    /// 主机玩家提交本地输入（由 PlayerController 调用）
+    /// 不走网络，直接交给 FrameSyncHandler
+    /// </summary>
+    public void SubmitHostInput(float dirX, float dirZ, bool jump, bool attack)
+    {
+        if (!_isRunning || !_isGameStarted || CurrentRoom == null) return;
+
+        int hostPlayerId = CurrentRoom.HostPlayerId;
+        _frameSyncHandler.SubmitLocalInput(hostPlayerId, dirX, dirZ, jump, attack);
+    }
+
+    #endregion
+
+    #region ==================== 帧就绪回调 ====================
+
+    /// <summary>
+    /// 由 FrameSyncHandler 在每帧输入收齐后回调
+    /// 负责：1. 交给本地 FrameExecutor 执行  2. 广播给所有远程客户端
+    /// </summary>
+    internal void OnFrameReady(InputFrame frame)
+    {
+        // 1. 本地执行
+        _frameExecutor.EnqueueFrame(frame);
+
+        // 2. 广播给远程客户端
+        var envelope = new NetMessage { InputFrame = frame };
+        BroadcastToAll(envelope);
+    }
+
+    #endregion
+
+    #region ==================== 网络工具方法 ====================
+
+    /// <summary>
+    /// 向指定客户端发送消息
+    /// </summary>
+    public void SendToClient(uint conv, NetMessage msg)
+    {
+        byte[] data = SerAndDeserPBTool.GetProtoBytes(msg);
+        KcpMgr.Instance.SendAsync(conv, data).Forget();
+    }
+
+    /// <summary>
+    /// 向所有已连接客户端广播消息
+    /// </summary>
+    public void BroadcastToAll(NetMessage msg)
+    {
+        byte[] data = SerAndDeserPBTool.GetProtoBytes(msg);
+        uint[] clients = KcpMgr.Instance.GetConnectClients();
+        foreach (uint conv in clients)
+        {
+            KcpMgr.Instance.SendAsync(conv, data).Forget();
+        }
+    }
+
+    /// <summary>
+    /// 向除指定客户端外的所有客户端广播
+    /// </summary>
+    public void BroadcastExcept(uint excludeConv, NetMessage msg)
+    {
+        byte[] data = SerAndDeserPBTool.GetProtoBytes(msg);
+        uint[] clients = KcpMgr.Instance.GetConnectClients();
+        foreach (uint conv in clients)
+        {
+            if (conv != excludeConv)
+                KcpMgr.Instance.SendAsync(conv, data).Forget();
+        }
+    }
+
+    #endregion
+}

@@ -162,7 +162,7 @@ public class NetMgr : MonoBehaviour
                 NetMessage.MsgOneofCase.PlayerList    => 14,
                 NetMessage.MsgOneofCase.StartGame     => 15,
                 NetMessage.MsgOneofCase.GameStart     => 16,
-                NetMessage.MsgOneofCase.InputFrame    => 20,
+                NetMessage.MsgOneofCase.InputTick    => 20,
                 NetMessage.MsgOneofCase.PlayerInput   => 21,
                 NetMessage.MsgOneofCase.CrystalSpawn  => 30,
                 NetMessage.MsgOneofCase.CrystalPickup => 31,
@@ -171,7 +171,7 @@ public class NetMgr : MonoBehaviour
                 NetMessage.MsgOneofCase.GameEnd       => 34,
                 NetMessage.MsgOneofCase.Reconnect     => 40,
                 NetMessage.MsgOneofCase.ReconnectAck  => 41,
-                NetMessage.MsgOneofCase.CatchUpFrames => 42,
+                NetMessage.MsgOneofCase.CatchUpTicks => 42,
                 _ => 0
             };
 
@@ -186,7 +186,7 @@ public class NetMgr : MonoBehaviour
                 NetMessage.MsgOneofCase.PlayerList      => envelope.PlayerList,
                 NetMessage.MsgOneofCase.StartGame       => envelope.StartGame,
                 NetMessage.MsgOneofCase.GameStart       => envelope.GameStart,
-                NetMessage.MsgOneofCase.InputFrame      => envelope.InputFrame,
+                NetMessage.MsgOneofCase.InputTick      => envelope.InputTick,
                 NetMessage.MsgOneofCase.PlayerInput     => envelope.PlayerInput,
                 NetMessage.MsgOneofCase.CrystalSpawn    => envelope.CrystalSpawn,
                 NetMessage.MsgOneofCase.CrystalPickup   => envelope.CrystalPickup,
@@ -195,7 +195,7 @@ public class NetMgr : MonoBehaviour
                 NetMessage.MsgOneofCase.GameEnd         => envelope.GameEnd,
                 NetMessage.MsgOneofCase.Reconnect       => envelope.Reconnect,
                 NetMessage.MsgOneofCase.ReconnectAck    => envelope.ReconnectAck,
-                NetMessage.MsgOneofCase.CatchUpFrames   => envelope.CatchUpFrames,
+                NetMessage.MsgOneofCase.CatchUpTicks   => envelope.CatchUpTicks,
                 _ => null
             };
 

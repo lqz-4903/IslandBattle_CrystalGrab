@@ -1,0 +1,204 @@
+═══════════════════════════════════════════════════════════════
+                    完 整 游 戏 流 程
+═══════════════════════════════════════════════════════════════
+
+【阶段1：创建房间】
+───────────────────────────────────────────────────────────────
+
+  房主UI (UIManager)
+    │  房主点"创建房间"
+    │  ① KcpMgr.StartAsServerAsync(port)
+    │  ② Send(new NetMessage{ CreateRoom = new CreateRoom{HostName} })
+    │
+    ▼
+  NetMgr.Send()
+    │  序列化 → KcpMgr.SendAsync
+    │
+    ▼
+  KcpMgr → 网络回环（本地服务器收到自己的包）
+    │
+    ▼
+  NetMgr.Update()
+    │  TryRecv → 解析 → EventCenter.Dispatch(10, conv, CreateRoom)
+    │
+    ▼
+  HostServer.OnCreateRoom()
+    │
+    ▼
+  RoomHandler.HandleCreateRoom()
+    │  CreateLocalRoom(hostName)
+    │  创建 RoomData，分配 playerId=1，设为房主
+    │
+    ▼
+  房间创建完成，等待其他玩家加入
+
+
+【阶段2：加入房间】
+───────────────────────────────────────────────────────────────
+
+  其他玩家UI
+    │  点"加入房间"，输入房间ID和昵称
+    │  ① KcpMgr.StartAsClientAsync(serverIP, port)
+    │  ② Send(new NetMessage{ JoinRoom = new JoinRoom{RoomId, PlayerName} })
+    │
+    ▼
+  KcpMgr → UDP 发送到服务端
+    │
+    ▼
+  NetMgr.Update() (房主侧)
+    │  TryRecv → EventCenter.Dispatch(12, conv, JoinRoom)
+    │
+    ▼
+  HostServer.OnJoinRoom(conv, JoinRoom)
+    │
+    ▼
+  RoomHandler.HandleJoinRoom(conv, JoinRoom)
+    │  ① 校验房间存在、ID匹配、未满
+    │  ② 分配 playerId
+    │  ③ SendJoinRoomAck → 告诉新玩家你被分配了哪个 playerId
+    │  ④ BroadcastPlayerList → 告诉房间内所有人最新的玩家列表
+    │
+    ▼
+  新玩家收到 JoinRoomAck + PlayerList
+  房间内其他人收到 PlayerList
+  UI 更新玩家列表显示
+
+
+【阶段3：开始游戏】
+───────────────────────────────────────────────────────────────
+
+  房主UI (UIManager)
+    │  点"开始游戏"按钮
+    │  直接调用（不走网络）：
+    │  HostServer → RoomHandler.HandleStartGame(conv)
+    │
+    ▼
+  RoomHandler.HandleStartGame(conv)
+    │  ① 校验是房主
+    │  ② 校验人数 >= 2
+    │  ③ 生成 RandomSeed, PlayerCount, GameDuration, TargetScore, FrameRate
+    │  ④ BroadcastToAll(GameStart)  → 远程客户端
+    │  ⑤ Dispatch(16, HOST_CONV, GameStart) → 房主本地
+    │
+    ▼
+  所有人的 EventCenter.Dispatch(16, conv, GameStart)
+    │
+    ▼
+  HostServer.OnGameStart(conv, GameStart)
+    │  ① _isGameStarted = true
+    │  ② FrameSyncHandler.StartFrameLoop(playerIds, frameRate)
+    │  ③ GameEventHandler.StartGameLoop(randomSeed, targetScore)
+    │  ④ FrameExcutor.Init(isHost, frameRate)
+    │
+    ▼
+  游戏正式开始
+
+
+【阶段4：游戏中 —— 帧同步循环】
+───────────────────────────────────────────────────────────────
+
+  ┌─────────────────────────────────────────────────────────┐
+  │                   每个 tick 循环                         │
+  │                                                         │
+  │  FrameSyncHandler.Tick(deltaTime)                       │
+  │    │                                                    │
+  │    ├─ 等待 tick 间隔到达                                │
+  │    │                                                    │
+  │    ├─ BeginNewTick() → _currentTick++                   │
+  │    │                                                    │
+  │    ├─ 等待所有玩家输入（或超时）                         │
+  │    │                                                    │
+  │    │  ┌─ 远程客户端 ─────────────────────┐              │
+  │    │  │  PlayerController 采集本地输入     │              │
+  │    │  │  Send(PlayerInput)                │              │
+  │    │  │       ↓                           │              │
+  │    │  │  NetMgr → EventCenter(21)         │              │
+  │    │  │       ↓                           │              │
+  │    │  │  HandlePlayerInput() 存入字典     │              │
+  │    │  └───────────────────────────────────┘              │
+  │    │                                                    │
+  │    │  ┌─ 房主本地 ────────────────────────┐              │
+  │    │  │  PlayerController 采集本地输入     │              │
+  │    │  │  SubmitLocalInput() 直接存入字典   │              │
+  │    │  │  （不走网络）                      │              │
+  │    │  └───────────────────────────────────┘              │
+  │    │                                                    │
+  │    ├─ 全部收齐 / 超时 → FinalizeTick()                  │
+  │    │    │                                               │
+  │    │    └─ 组装 InputFrame{ tick, [所有PlayerInput] }    │
+  │    │                                                    │
+  │    ▼                                                    │
+  │  HostServer.OnFrameReady(InputFrame)                    │
+  │    │                                                    │
+  │    ├─ FrameExcutor.EnqueueFrame() → 本地执行            │
+  │    │    │                                               │
+  │    │    └─ ExecuteSingleFrame()                         │
+  │    │         └─ ApplyPlayerInput() × N个玩家            │
+  │    │              → 移动、攻击、跳跃...                  │
+  │    │                                                    │
+  │    └─ BroadcastToAll(InputFrame) → 远程客户端执行       │
+  │                                                         │
+  └─────────────────────────────────────────────────────────┘
+
+
+【阶段4.5：游戏中 —— 游戏事件】
+───────────────────────────────────────────────────────────────
+
+  GameEventHandler.Tick(deltaTime)
+    │
+    ├─ 每5秒 → SpawnCrystal() → BroadcastToAll(CrystalSpawn)
+    │
+    │
+  客户端拾取水晶：
+    客户端 → Send(CrystalPickup{crystal_id, player_id})
+    → EventCenter(31) → HandleCrystalPickup()
+    → 服务端验证 → 加分 → BroadcastToAll(CrystalPickup{new_score})
+
+  客户端受击：
+    客户端 → Send(PlayerHit{attacker_id, victim_id, dropped_count})
+    → EventCenter(32) → HandlePlayerHit()
+    → 服务端验证 → 扣血扣分 → BroadcastToAll(PlayerHit)
+
+  客户端坠落：
+    客户端 → Send(PlayerFall{player_id, dropped_count})
+    → EventCenter(33) → HandlePlayerFall()
+    → 服务端验证 → 扣血扣分 → BroadcastToAll(PlayerFall)
+
+
+【阶段5：游戏结束】
+───────────────────────────────────────────────────────────────
+
+  GameEventHandler
+    │  分数达标 或 最后一人存活
+    │
+    ▼
+  EndGame(winnerId)
+    │  组装 GameEnd{scores, winner_id}
+    │  BroadcastToAll(GameEnd)
+    │
+    ▼
+  HostServer.OnGameEnded()
+    │  _isGameStarted = false
+    │  帧同步停止
+    │
+    ▼
+  所有客户端收到 GameEnd → 显示结算画面
+
+
+【断线重连】
+───────────────────────────────────────────────────────────────
+
+  掉线客户端
+    │  重新连接 KcpMgr
+    │  Send(Reconnect{player_id, last_tick})
+    │
+    ▼
+  EventCenter(40) → FrameSyncHandler.HandleReconnect()
+    │  ① 发 ReconnectAck{success, catch_up_from}
+    │  ② 发 CatchUpFrames{from_tick, to_tick, [InputFrame...]}
+    │  ③ 重新加入活跃玩家集合
+    │
+    ▼
+  客户端收到 CatchUpFrames → FrameExcutor → 快速追赶执行
+
+═══════════════════════════════════════════════════════════════
