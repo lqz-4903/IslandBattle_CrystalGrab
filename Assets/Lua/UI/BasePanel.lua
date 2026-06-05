@@ -38,6 +38,19 @@ function BasePanel:Init(name)
         -- GetComponentsInChildren
         -- 找所有UI控件 存起来
         local allControls = self.panelObj:GetComponentsInChildren(typeof(UIBehaviour))
+        -- 优化：关闭所有Text和不需要交互的Image的RaycastTarget
+        for i = 0, allControls.Length - 1 do
+            local ctrl = allControls[i]
+            local typeName = ctrl:GetType().Name
+            -- Text一律关掉，Image只保留btn/tog前缀的
+            if typeName == "Text" then
+                ctrl.raycastTarget = false
+            elseif typeName == "Image" and
+                   string.find(ctrl.name, "btn") == nil and
+                   string.find(ctrl.name, "tog") == nil then
+                ctrl.raycastTarget = false
+            end
+        end
         -- 如果存入一些对于我们来说没用UI控件
         -- 为了避免 找各种无用控件 定一个规则 拼面板时 控件命名一定按规范来
         -- Button btnName

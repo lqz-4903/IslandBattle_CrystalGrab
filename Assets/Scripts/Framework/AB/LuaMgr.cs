@@ -76,8 +76,8 @@ public class LuaMgr
             }
         }
 
-        // 5. 所有目录都找不到，才打印 1 次日志（不会重复打印）
-        Debug.LogWarning("CustomLoader 所有目录都找不到：" + filePath);
+        // 5. 文件系统找不到，返回null让CustomABLoader兜底
+        // 不打印日志，避免AB模式下刷屏
         return null;
     }
 
@@ -87,8 +87,18 @@ public class LuaMgr
     //打包时 要把lua文件后缀改为txt
     public byte[] CustomABLoader(ref string filePath)
     {
+        //把.换成/，和CustomLoader保持一致
+        string realPath = filePath.Replace(".", "/");
+
+        // 取文件名部分（去掉目录前缀），因为AB包中资源路径带Assets/LuaTxt/前缀
+        // 直接用文件名加载，Lua文件名都是唯一的
+        string fileName = realPath;
+        int lastSlash = realPath.LastIndexOf('/');
+        if (lastSlash >= 0)
+            fileName = realPath.Substring(lastSlash + 1);
+
         //通过之前写的AB包管理器 加载的lua脚本资源
-        TextAsset lua = ABMgr.Instance.LoadRes<TextAsset>("lua", filePath + ".lua.txt");
+        TextAsset lua = ABMgr.Instance.LoadRes<TextAsset>("lua", fileName + ".lua.txt");
         if (lua != null)
             return lua.bytes;
         else

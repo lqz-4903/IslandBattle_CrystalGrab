@@ -1,30 +1,42 @@
 ManifestFileVersion: 0
-CRC: 3130825811
+CRC: 1127192781
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: a2300919d0200e65d427f74529d1c81c
+    Hash: 22855e9fbb76c5b064a17c3176996bf7
   TypeTreeHash:
     serializedVersion: 2
     Hash: 5ad585dd02dfb5016c0dad519eab8f49
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: a2300919d0200e65d427f74529d1c81c
+    Hash: 22855e9fbb76c5b064a17c3176996bf7
 HashAppended: 0
 ClassTypes:
 - Class: 49
   Script: {instanceID: 0}
 SerializeReferenceClassIdentifiers: []
 Assets:
-- Assets/LuaTxt/BasePanel.lua.txt
-- Assets/LuaTxt/SplitTools.lua.txt
-- Assets/LuaTxt/BeginPanel.lua.txt
-- Assets/LuaTxt/IsNull.lua.txt
-- Assets/LuaTxt/Official_NickName.lua.txt
-- Assets/LuaTxt/Custom_NickName.lua.txt
+- Assets/LuaTxt/UI/PlayExplainPanel.lua.txt
+- Assets/LuaTxt/UI/BeginBKPanel.lua.txt
+- Assets/LuaTxt/UI/TipPanel.lua.txt
+- Assets/LuaTxt/Libs/JsonUtility.lua.txt
+- Assets/LuaTxt/UI/BeginPanel.lua.txt
+- Assets/LuaTxt/UI/ChooseRoomPanel.lua.txt
+- Assets/LuaTxt/UI/BasePanel.lua.txt
+- Assets/LuaTxt/Libs/Official_NickName.lua.txt
+- Assets/LuaTxt/UI/SettingPanel.lua.txt
+- Assets/LuaTxt/Libs/Object.lua.txt
+- Assets/LuaTxt/Libs/Custom_NickName.lua.txt
+- Assets/LuaTxt/UI/CreateRoomPanel.lua.txt
+- Assets/LuaTxt/UI/ChangeNamePanel.lua.txt
+- Assets/LuaTxt/Libs/Fix64Vector3.lua.txt
+- Assets/LuaTxt/Libs/SplitTools.lua.txt
+- Assets/LuaTxt/Libs/DeterministicRandom.lua.txt
 - Assets/LuaTxt/Main.lua.txt
-- Assets/LuaTxt/BeginBKPanel.lua.txt
-- Assets/LuaTxt/Object.lua.txt
-- Assets/LuaTxt/JsonUtility.lua.txt
+- Assets/LuaTxt/Libs/PlayerData.lua.txt
+- Assets/LuaTxt/UI/JoinRoomPanel.lua.txt
+- Assets/LuaTxt/Libs/IsNull.lua.txt
+- Assets/LuaTxt/UI/AboutPanel.lua.txt
 - Assets/LuaTxt/InitClass.lua.txt
+- Assets/LuaTxt/Libs/Fix64.lua.txt
 Dependencies: []
