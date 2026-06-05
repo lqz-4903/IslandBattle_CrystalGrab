@@ -17,7 +17,7 @@ using UnityEngine;
 /// ═══════════════════════════════════════════════════════════════
 /// </summary>
 
-public static class ClassForNothing2 { /* 为了避免调用时产生过长的说明 */ }
+public static class ClassForNothing4 { /* 为了避免调用时产生过长的说明 */ }
 
 /// <summary>
 /// TickExcutor —— 帧执行器（客户端侧 MonoBehaviour）
@@ -27,10 +27,10 @@ public class TickExecutor : MonoBehaviour
     #region =============== 配置 ===============
 
     // 默认逻辑帧率（每秒15帧）
-    private const int _DEFAULT_TICK_RATE = 15;
+    private const int DefaultTickRate = 15;
 
     // 追赶模式下每帧最多执行的帧数 （防止一帧内执行过多导致卡顿）
-    private const int _MAX_CATCHUP_PRE_TICK = 5;
+    private const int MaxCatchUpPreTick = 5;
 
     #endregion
 
@@ -72,7 +72,7 @@ public class TickExecutor : MonoBehaviour
     /// </summary>
     /// <param name="isHost">是否为主机模式</param>
     /// <param name="tickRate">帧率</param>
-    public void Init(bool isHost, int tickRate = _DEFAULT_TICK_RATE)
+    public void Init(bool isHost, int tickRate = DefaultTickRate)
     {
         _isHost = isHost;
         _tickRate = tickRate;
@@ -87,11 +87,11 @@ public class TickExecutor : MonoBehaviour
         if (!isHost)
         {
             // 监听单帧输入事件
-
+            EventCenter.AddListener(20, OnInputTickRecvd);
             // 监听重连确定事件
-
+            EventCenter.AddListener(41, OnReconnectAckRecvd);
             //监听批量追赶帧事件
-
+            EventCenter.AddListener(42, OnCatchUpTickRecvd);
         }
 
         Debug.Log("【TickExecutor】初始化 模式" + (isHost ? "主机" : "客户端") + " 帧率：" + tickRate);
@@ -102,7 +102,9 @@ public class TickExecutor : MonoBehaviour
         //  客户端模式下注销网络事件 避免内存泄漏
         if (!_isHost && _isInitialized)
         {
-            
+            EventCenter.RemoveListener(20, OnInputTickRecvd);
+            EventCenter.RemoveListener(41, OnReconnectAckRecvd);
+            EventCenter.RemoveListener(42, OnCatchUpTickRecvd);
         }
     }
 
@@ -115,7 +117,7 @@ public class TickExecutor : MonoBehaviour
         // 未初始化跳过
         if (!_isInitialized) return;
 
-        if (!_isHost)
+        if (_isHost)
         {
             // 主机模式：队列中有帧就立即全部执行 不等待
             while (_pendingTicks.Count > 0)
@@ -146,7 +148,7 @@ public class TickExecutor : MonoBehaviour
         {
             // 追赶模式：每帧最多执行 MAX_CATCHUP_PER_TICK 帧，快速消化积压
             int executed = 0;
-            while (_pendingTicks.Count > 0 && executed < _MAX_CATCHUP_PRE_TICK)
+            while (_pendingTicks.Count > 0 && executed < MaxCatchUpPreTick)
             {
                 // 取出队首帧并执行
                 if (_pendingTicks.TryDequeue(out InputTick result))
@@ -184,8 +186,6 @@ public class TickExecutor : MonoBehaviour
                 Debug.Log("【TickExcutor】帧积压 " + _pendingTicks.Count + " 帧 进入追赶模式");
             }
         }
-
-
     }
 
     #endregion
@@ -211,6 +211,7 @@ public class TickExecutor : MonoBehaviour
     /// <summary>
     /// 将单个玩家的输入应用到游戏对象
     /// ★★★ 需要对接实际游戏逻辑 ★★★
+    /// ★★★★★★★★★★ 要做确定性模拟 ★★★★★★★★★★★ 
     /// </summary>
     private void ApplyPlayerInput(PlayerInput input)
     {
@@ -225,6 +226,7 @@ public class TickExecutor : MonoBehaviour
     /// <summary>
     /// 单帧执行完毕后的回调
     /// ★★★ 可在此做物理模拟、碰撞检测等 ★★★
+    /// ★★★★★★★★★★ 要做确定性模拟 ★★★★★★★★★★★ 
     /// </summary>
     private void OnTickExecuted(InputTick tick)
     {
@@ -303,3 +305,4 @@ public class TickExecutor : MonoBehaviour
     #endregion
 
 }
+// 211 - 233 Todo

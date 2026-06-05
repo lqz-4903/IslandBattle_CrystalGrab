@@ -1,7 +1,6 @@
 ﻿using GameProto;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEditor;
 using UnityEngine;
 
 // ═══════════════════════════════════════════════════════════════
@@ -45,7 +44,7 @@ public class RoomData
     public const uint HOST_CONV = 0;
 
     // 获取所有玩家ID
-    public int[] GerAllPlayerIds()
+    public int[] GetAllPlayerIds()
     {
         return IdToPlayer.Keys.ToArray();
     }
@@ -82,7 +81,7 @@ public class RoomData
 ///   4位大写字母+数字随机字符串（如 "AB3K"）
 /// ═══════════════════════════════════════════════════════════════
 /// </summary>
-public static class ClassForNothing3 { /* 为了避免调用时产生过长的说明 */ }
+public static class ClassForNothing2 { /* 为了避免调用时产生过长的说明 */ }
 
 /// <summary>
 /// RoomHandler —— 房间管理处理器
@@ -147,6 +146,7 @@ public class RoomHandler
         if (request.RoomId != room.RoomId)
         {
             SendJoinRoomAck(0, false, 0, "房间ID错误", "", null);
+            return;
         }
 
         // 校验：房间是否已满（最多4人 可调整）
@@ -231,11 +231,11 @@ public class RoomHandler
         var envelope = new NetMessage { GameStart = gameStart };
         _host.BroadcastToAll(envelope);
 
-        // 2.房主本地也要收到 GameStart（不走网络，直接派发）
-        EventCenter.Dispatch(16, RoomData.HOST_CONV, gameStart);
-
         // 通知 HostServer 游戏开始
-        _host.OnStartGame();
+        _host.OnStartGame(gameStart.RandomSeed);
+
+        // 2.房主本地也要收到 GameStart（不走网络，直接派发）
+        EventCenter.Dispatch(16, RoomData.HOST_CONV, gameStart);        
     }
 
     #endregion
@@ -335,7 +335,6 @@ public class RoomHandler
     /// </summary>
     public int HostPlayerId => _host.CurrentRoom?.HostPlayerId ?? -1;
 
-
     #endregion
 
     #region =============== 内部方法 ===============
@@ -392,3 +391,4 @@ public class RoomHandler
 
     #endregion
 }
+// Done

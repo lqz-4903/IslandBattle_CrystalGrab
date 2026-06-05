@@ -16,6 +16,7 @@ using UnityEngine;
 ///   所有事件由服务端权威判定，客户端只负责上报和表现
 /// ═══════════════════════════════════════════════════════════════
 /// </summary>
+
 public class GameEventHandler
 {
     private readonly HostServer _host;

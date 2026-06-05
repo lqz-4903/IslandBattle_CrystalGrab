@@ -1,8 +1,6 @@
 ﻿using GameProto;
 using Google.Protobuf;
 using System;
-using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 
 /// <summary>
@@ -29,7 +27,7 @@ using UnityEngine;
 ///   5. GameEnd     → 结算，停止帧同步
 /// ═══════════════════════════════════════════════════════════════
 /// </summary>
-public static class ClassForNothing5 { /* 为了避免调用时产生过长的说明 */ }
+public static class ClassForNothing1 { /* 为了避免调用时产生过长的说明 */ }
 
 /// <summary>
 /// HostServer —— 主机服务器协调器（单例 MonoBehaviour）
@@ -49,9 +47,9 @@ public class HostServer : MonoBehaviour
     private RoomHandler _roomHandler;
     // 帧同步核心（服务端收集输入、分发帧）
     private TickSyncHandler _tickSyncHandler;
-    // 帧执行器（客户端执行帧、推进游戏）
-    private GameEventHandler _gameEventHandler;
     // 游戏事件（水晶、受伤、坠落、结算）
+    private GameEventHandler _gameEventHandler;
+    // 帧执行器（客户端执行帧、推进游戏）
     private TickExecutor _tickExcutor;
 
     #endregion
@@ -66,11 +64,14 @@ public class HostServer : MonoBehaviour
     private bool _isGameStarted;
     public bool IsGameStarted => _isGameStarted;
 
+    // 供外部调用
+    public GameEventHandler GameEventHandler => _gameEventHandler;
+
     // 当前房间数据（由RoomHandler管理）
     public RoomData CurrentRoom;
 
     // 默认端口
-    private const int _DEFAULT_PORT = 8888;
+    private const int DefaultPort = 8888;
 
     #endregion
 
@@ -85,12 +86,89 @@ public class HostServer : MonoBehaviour
         _gameEventHandler = new GameEventHandler(this);
 
         _tickExcutor = GetComponent<TickExecutor>();
-        if (_tickExcutor = null)
+        if (_tickExcutor == null)
             _tickExcutor = gameObject.AddComponent<TickExecutor>();
     }
 
+    private void Start()
+    {
+        SubscribeEvents();
+    }
+
+    private void Update()
+    {
+        if (!IsRunning || !_isGameStarted) return;
+
+        _tickSyncHandler.Tick(Time.deltaTime);
+        _gameEventHandler.Tick(Time.deltaTime);
+    }
+
+    private void OnDestroy()
+    {
+        UnSubscribEvents();
+        Shutdown();
+    }
 
     #endregion
+
+    #region =============== 启动 / 关闭 ===============
+
+    /// <summary>
+    /// 以主机模式启动（服务器 + 本地玩家）
+    /// UI 层调用此方法创建房间
+    /// </summary>
+    /// <param name="hostPlayerName"></param>
+    /// <param name="port"></param>
+    public async void StartHost(string hostPlayerName, int port = DefaultPort)
+    {
+        if (_isRunning)
+        {
+            Debug.Log("【HostServer】已在运行中");
+            return;
+        }
+
+        try
+        {
+            // 1.启动 KCP 服务器
+            await KcpMgr.Instance.StartAsServerAsync(port);
+            _isRunning = true;
+
+            // 2.注册 KcpMgr 连接 / 断开回调
+            KcpMgr.Instance.OnClientConnected = OnClientConnected;
+            KcpMgr.Instance.OnClientDisconnected = OnClientDisconnected;
+
+            // 3.创建房间
+            _roomHandler.CreateLocalRoom(hostPlayerName);
+
+            // 4.初始化帧执行器（主机模式）
+            _tickExcutor.Init(isHost: true);
+
+            Debug.Log("【HostServer】主机启动成功，端口：" + port);
+        }
+        catch (Exception e)
+        {
+            Debug.Log("【HostServer】启动失败：" + e.Message);
+        }
+    }
+
+    public async void Shutdown()
+    {
+        if (!_isRunning) return;
+
+        _isGameStarted = false;
+        _isRunning = false;
+
+        _tickSyncHandler.Stop();
+        _gameEventHandler.Stop();
+
+        await KcpMgr.Instance.StopAsync();
+
+        CurrentRoom = null;
+        Debug.Log("【HostServer】主机已关闭");
+    }
+
+    #endregion
+
 
     #region =============== 事件注册 ===============
 
@@ -105,6 +183,11 @@ public class HostServer : MonoBehaviour
         EventCenter.AddListener(21, OnPlayerInput);
 
         // — 游戏事件消息 —
+        EventCenter.AddListener(31, OnCrystalPickup);
+        EventCenter.AddListener(32, OnPlayerHit);
+        EventCenter.AddListener(33, OnPlayerFall);
+        EventCenter.AddListener(35, OnPlayerRespawn);
+        
 
         // — 重连消息 —
         EventCenter.AddListener(40, OnReconnect);
@@ -118,10 +201,11 @@ public class HostServer : MonoBehaviour
         EventCenter.RemoveListener(10, OnCreateRoom);
         EventCenter.RemoveListener(12, OnJoinRoom);
         EventCenter.RemoveListener(16, OnGameStart);
-
         EventCenter.RemoveListener(21, OnPlayerInput);
-
-
+        EventCenter.RemoveListener(31, OnCrystalPickup);
+        EventCenter.RemoveListener(32, OnPlayerHit);
+        EventCenter.RemoveListener(33, OnPlayerFall);
+        EventCenter.RemoveListener(35, OnPlayerRespawn);
         EventCenter.RemoveListener(40, OnReconnect);
         EventCenter.RemoveListener(1, OnHeartbeat);
     }
@@ -148,11 +232,36 @@ public class HostServer : MonoBehaviour
     // — 帧同步 —
     private void OnPlayerInput(uint conv, IMessage msg)
     {
-        if (!_isRunning || _isGameStarted) return;
+        if (!_isRunning || !_isGameStarted) return;
         _tickSyncHandler.HandlePlayerInput(msg as PlayerInput);
     }
 
     // — 游戏事件 —
+
+    private void OnCrystalPickup(uint conv, IMessage msg)
+    {
+        if (!_isRunning || !_isGameStarted) return;
+        _gameEventHandler.HandleCrystalPickup(msg as CrystalPickup);
+    }
+
+    private void OnPlayerHit(uint conv, IMessage msg)
+    {
+        if (!_isRunning || !_isGameStarted) return;
+        _gameEventHandler.HandlePlayerHit(msg as PlayerHit);
+    }
+
+    private void OnPlayerFall(uint conv, IMessage msg)
+    {
+        if (!_isRunning || !_isGameStarted) return;
+        _gameEventHandler.HandlePlayerFall(msg as PlayerFall);
+    }
+
+    private void OnPlayerRespawn(uint conv, IMessage msg)
+    {
+        if (!_isRunning || !_isGameStarted) return;
+        _gameEventHandler.HandlePlayerRespawn(msg as PlayerRespawn);
+    }
+
 
     // — 重连 —
     private void OnReconnect(uint conv, IMessage msg)
@@ -168,7 +277,34 @@ public class HostServer : MonoBehaviour
     // — 心跳 —
     private void OnHeartbeat(uint conv, IMessage msg)
     {
-        // 服务器收到心跳后原样回发
+        var hb = new HeartBeat { Time = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() };
+        SendToClient(conv, new NetMessage { Heartbeat = hb });
+    }
+
+
+    #endregion
+
+    #region =============== KcpMgr 连接回调 ===============
+
+    private void OnClientConnected(uint conv)
+    {
+        Debug.Log("【HostServer】新客户端连接 Conv：" + conv);
+    }
+
+    private void OnClientDisconnected(uint conv, string reason)
+    {
+        Debug.Log("【HostServer】客户端断开 Conv：" + conv + " 原因：" + reason);
+
+        // 从房间移除
+        _roomHandler.HandlePlayerDisconnect(conv);
+
+        // 从帧同步中移除
+        if (_isGameStarted)
+        {
+            int playerId = _roomHandler.GetPlayerIdByConv(conv);
+            if (playerId > 0)
+                _tickSyncHandler.RemovePlayer(playerId);
+        }
     }
 
 
@@ -179,14 +315,61 @@ public class HostServer : MonoBehaviour
     /// <summary>
     /// 由 RoomHandler 调用，标记游戏开始
     /// </summary>
-    public void OnStartGame()
+    public void OnStartGame(int randomSeed)
     {
         _isGameStarted = true;
 
         // 将玩家集合传给帧同步和游戏事件处理器
-        var playerIds = CurrentRoom.GetAllPlayerProtos();
+        var playerIds = CurrentRoom.GetAllPlayerIds();
+        _tickSyncHandler.StartTickLoop(playerIds);
+        _gameEventHandler.StartGameLoop(randomSeed);
 
-        Debug.Log("【HostServer】游戏开始，玩家数：" + playerIds);
+        Debug.Log("【HostServer】游戏开始，玩家数：" + playerIds.Length);
+    }
+
+    /// <summary>
+    /// 由 GameEventHandler 调用，标记游戏结束
+    /// </summary>
+    public void OnGameEnded()
+    {
+        _isGameStarted = false;
+        _tickSyncHandler.Stop();
+        _gameEventHandler.Stop();
+        Debug.Log("【HostServer】游戏结束");
+    }
+
+    #endregion
+
+    #region =============== 主机玩家输入 ===============
+
+    /// <summary>
+    /// 本机玩家提交给本地输入（由PlayerController调用）
+    /// 不走网络 直接交给 TickSyncHandler
+    /// </summary>
+    public void SubmitHostInput(uint moveDir, bool jump, bool attack, bool skill, float cameraYaw, float chargeTime)
+    {
+        if (!_isRunning || !_isGameStarted || CurrentRoom == null) return;
+
+        int hostPlayerId = CurrentRoom.HostPlayerId;
+        _tickSyncHandler.SubmitLocalInput(hostPlayerId, moveDir, jump, attack, skill, cameraYaw, chargeTime);
+    }
+    #endregion
+
+    #region =============== 帧就绪回调 ===============
+
+    /// <summary>
+    /// 由 TickSyncHandler 在每帧输入收齐后回调
+    /// 负责：1.交给本地 TickExecutor 执行 2.广播给所有远程客户端
+    /// </summary>
+    /// <param name="tick"></param>
+    internal void OnTickReady(InputTick tick)
+    {
+        // 1.本地执行
+        _tickExcutor.EnqueueTick(tick);
+
+        // 2.广播给远程客户端
+        var enevlope = new NetMessage { InputTick = tick };
+        BroadcastToAll(enevlope);
     }
 
 

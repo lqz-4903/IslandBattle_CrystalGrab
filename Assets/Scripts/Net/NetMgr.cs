@@ -169,6 +169,7 @@ public class NetMgr : MonoBehaviour
                 NetMessage.MsgOneofCase.PlayerHit     => 32,
                 NetMessage.MsgOneofCase.PlayerFall    => 33,
                 NetMessage.MsgOneofCase.GameEnd       => 34,
+                NetMessage.MsgOneofCase.PlayerRespawn => 35,
                 NetMessage.MsgOneofCase.Reconnect     => 40,
                 NetMessage.MsgOneofCase.ReconnectAck  => 41,
                 NetMessage.MsgOneofCase.CatchUpTicks => 42,
@@ -186,16 +187,17 @@ public class NetMgr : MonoBehaviour
                 NetMessage.MsgOneofCase.PlayerList      => envelope.PlayerList,
                 NetMessage.MsgOneofCase.StartGame       => envelope.StartGame,
                 NetMessage.MsgOneofCase.GameStart       => envelope.GameStart,
-                NetMessage.MsgOneofCase.InputTick      => envelope.InputTick,
+                NetMessage.MsgOneofCase.InputTick       => envelope.InputTick,
                 NetMessage.MsgOneofCase.PlayerInput     => envelope.PlayerInput,
                 NetMessage.MsgOneofCase.CrystalSpawn    => envelope.CrystalSpawn,
                 NetMessage.MsgOneofCase.CrystalPickup   => envelope.CrystalPickup,
                 NetMessage.MsgOneofCase.PlayerHit       => envelope.PlayerHit,
                 NetMessage.MsgOneofCase.PlayerFall      => envelope.PlayerFall,
+                NetMessage.MsgOneofCase.PlayerRespawn   => envelope.PlayerRespawn,
                 NetMessage.MsgOneofCase.GameEnd         => envelope.GameEnd,
                 NetMessage.MsgOneofCase.Reconnect       => envelope.Reconnect,
                 NetMessage.MsgOneofCase.ReconnectAck    => envelope.ReconnectAck,
-                NetMessage.MsgOneofCase.CatchUpTicks   => envelope.CatchUpTicks,
+                NetMessage.MsgOneofCase.CatchUpTicks    => envelope.CatchUpTicks,
                 _ => null
             };
 
@@ -210,3 +212,4 @@ public class NetMgr : MonoBehaviour
 
     #endregion
 }
+// Done

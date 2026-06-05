@@ -1,10 +1,5 @@
 ﻿using GameProto;
-using Google.Protobuf;
-using System;
 using System.Collections.Generic;
-using System.Net.NetworkInformation;
-using System.Runtime.CompilerServices;
-using Unity.IO.LowLevel.Unsafe;
 using UnityEngine;
 
 /// <summary>
@@ -31,7 +26,7 @@ using UnityEngine;
 ///   保存最近 N 帧的 InputTick，用于断线重连时发送 CatchUpTicks
 /// ═══════════════════════════════════════════════════════════════
 /// </summary>
-public static class ClassForNothing1 { /* 为了避免调用时产生过长的说明 */ }
+public static class ClassForNothing3 { /* 为了避免调用时产生过长的说明 */ }
 
 /// <summary>
 /// TickSyncHandler —— 帧同步处理器（服务端）
@@ -43,13 +38,13 @@ public class TickSyncHandler
     #region =============== 配置 ===============
 
     // 逻辑帧率（帧/秒）
-    private const int _DEFAULT_TICK_RATE = 15;
+    private const int DefaultTickRate = 15;
 
     // 等待单帧输入的最大时间（秒），超时用空输入填充
-    private const float _MAX_WAIT_TIME = 0.1f;
+    private const float MaxWaitTime = 0.1f;
 
     // 保留的帧历史数量（用于断线重连）
-    private const int _MAX_TICK_HISTORY = 1500; // 约100秒 @ 15fps
+    private const int MaxTickHistory = 1500; // 约100秒 @ 15fps
 
     #endregion
 
@@ -86,7 +81,7 @@ public class TickSyncHandler
     /// <summary>
     /// 帧历史：用于断线重连时发送 CatchUpTicks
     /// </summary>
-    private List<InputTick> _tickHistroy = new();
+    private List<InputTick> _tickHistory = new();
 
     #endregion
 
@@ -104,7 +99,7 @@ public class TickSyncHandler
     /// 启动帧同步循环
     /// </summary>
     /// <param name="playerIds"></param>
-    public void StartTickLoop(int[] playerIds, int tickRate = _DEFAULT_TICK_RATE)
+    public void StartTickLoop(int[] playerIds, int tickRate = DefaultTickRate)
     {
         _tickInterval = 1f / tickRate;
         _currentTick = 0;
@@ -113,15 +108,14 @@ public class TickSyncHandler
         _isWaitingForInput = false;
         _activePlayers.Clear();
         _currentTickInputs.Clear();
-        _tickHistroy.Clear();
+        _tickHistory.Clear();
 
         foreach (int id in playerIds)
             _activePlayers.Add(id);
 
         _isRunning = true;
 
-        Debug.Log("【TickSyncHandler】帧同步启动，帧率：" + _DEFAULT_TICK_RATE + "fps" +
-                  ", 玩家数：" + _activePlayers.Count);
+        Debug.Log("【TickSyncHandler】帧同步启动，帧率：" + tickRate + "fps, 玩家数：" + _activePlayers.Count);
     }
 
     /// <summary>
@@ -171,7 +165,7 @@ public class TickSyncHandler
             }
         }
 
-        if (allRecved || _waitTimer >= _MAX_WAIT_TIME)
+        if (allRecved || _waitTimer >= MaxWaitTime)
             // 结束当前帧
             FinalizeTick();
     }
@@ -182,7 +176,7 @@ public class TickSyncHandler
     #region =============== 帧逻辑 =============== 
 
     /// <summary>
-    /// 开始新的一帧：重置输入手机状态
+    /// 开始新的一帧
     /// </summary>
     private void BeginNewTick()
     {
@@ -201,7 +195,7 @@ public class TickSyncHandler
         _isWaitingForInput = false;
 
         // 组装 InputTick
-        var InputTick = new InputTick
+        var inputTick = new InputTick
         {
             Tick = _currentTick
         };
@@ -210,16 +204,17 @@ public class TickSyncHandler
         {
             if (_currentTickInputs.TryGetValue(playerId, out PlayerInput input))
             {
-                InputTick.Inputs.Add(input);
+                inputTick.Inputs.Add(input);
             }
             else
             {
                 // 超时：填充空输入
-                InputTick.Inputs.Add(new PlayerInput
+                inputTick.Inputs.Add(new PlayerInput
                 {
                     PlayerId = playerId,
                     Tick = _currentTick,
                     MoveDir = 0,
+                    Jump = false,
                     Attack = false,
                     Skill = false,
                     CameraYaw = 0f,
@@ -229,12 +224,12 @@ public class TickSyncHandler
         }
 
         // 保存到帧历史
-        _tickHistroy.Add(InputTick);
-        if (_tickHistroy.Count > _MAX_TICK_HISTORY)
-            _tickHistroy.RemoveAt(0);
+        _tickHistory.Add(inputTick);
+        if (_tickHistory.Count > MaxTickHistory)
+            _tickHistory.RemoveAt(0);
 
         // 回调 HostServer：本地执行 + 广播
-        //_host.OnTickReady(InputTick);
+        _host.OnTickReady(inputTick);
     }
 
     #endregion
@@ -263,7 +258,7 @@ public class TickSyncHandler
     /// <param name="skill"></param>
     /// <param name="cameraYaw"></param>
     /// <param name="chargeTime"></param>
-    public void SubmitLocalInput(int playerId, uint moveDir, bool attack, bool skill, float cameraYaw, float chargeTime)
+    public void SubmitLocalInput(int playerId, uint moveDir, bool jump, bool attack, bool skill, float cameraYaw, float chargeTime)
     {
         if (!_isRunning || !_isWaitingForInput) return;
         if (!_activePlayers.Contains(playerId)) return;
@@ -273,10 +268,11 @@ public class TickSyncHandler
             PlayerId = playerId,
             Tick = _currentTick,
             MoveDir = moveDir,
+            Jump = jump,
             Attack = attack,
             Skill = skill,
             CameraYaw = cameraYaw,
-            ChargeTime = cameraYaw
+            ChargeTime = chargeTime
         };
     }
 
@@ -336,7 +332,7 @@ public class TickSyncHandler
             ToTick = _currentTick
         };
 
-        foreach (var tick in _tickHistroy)
+        foreach (var tick in _tickHistory)
         {
             if (tick.Tick > lastTick && tick.Tick <= _currentTick)
                 catchUp.Ticks.Add(tick);
@@ -349,8 +345,6 @@ public class TickSyncHandler
         }
     }
 
-
     #endregion
-
 }
-
+// DONE

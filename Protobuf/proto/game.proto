@@ -31,6 +31,7 @@ message NetMessage{
 		PlayerHit 	  player_hit				= 32;
 		PlayerFall	  player_fall				= 33;
 		GameEnd		  	game_end					= 34;
+		PlayerRespawn  player_respawn  = 35;
 
 		// 重连
 		Reconnect 	  reconnect 				= 40;
@@ -116,10 +117,12 @@ message PlayerInput{
 	int32  player_id		= 1;
 	int32  tick 				= 2;
 	uint32 move_dir			= 3;	// 4bit： bit0 = W | bit1 = S | bit2 = A | bit3 = D
+	bool   jump	        = 8;  // 是否跳了
 	bool   attack				= 4;	// 左键点击（这一tick按下）
 	bool   skill				= 5;	// 右键松开（蓄力释放 仅松开那一tick为true）
 	float  camera_yaw		= 6;	// 摄像机水平角度（度） 决定WASD的前方
 	float  charge_time	= 7;	// 右键蓄力时长（秒） skill = true 时有效
+
 }
 
 // 20
@@ -153,13 +156,21 @@ message CrystalPickup{
 message PlayerHit{
 	int32 attacker_id		= 1;
 	int32 victim_id			= 2;
-	int32 dropped_count = 3;		// 掉了几颗
+	int32 dropped_count = 3;		// 掉了几颗晶石
 }
 
 // 33
 message PlayerFall{
 	int32 player_id 		= 1;
 	int32 dropped_count = 2;		// 掉了全部晶石数
+}
+
+// 35
+message PlayerRespawn {
+	int32  player_id = 1;
+	float  pos_x     = 2;  // 复活点位置
+	float  pos_y     = 3;
+	float  pos_z     = 4;
 }
 
 // 34
