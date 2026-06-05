@@ -49,21 +49,35 @@ public class LuaMgr
     /// <returns></returns>
     private byte[] CustomLoader(ref string filePath)
     {
-        //通过函数中的逻辑 去加载 lua文件
-        //传入的参数 是 require执行的lua脚本文件名
-        //拼接一个lua文件所在路径
-        string path = Path.Combine(Application.dataPath, "Lua", filePath + ".lua");
+        // 1. 跳过 xlua 系统脚本，不打印日志
+        if (filePath.StartsWith("xlua."))
+            return null;
 
-        //有路径 就去加载文件
-        //判断文件是否存在
-        if (File.Exists(path))
+        // 2. 把 . 换成路径符号
+        string realPath = filePath.Replace(".", "/");
+
+        // 3. 只定义【根目录】，不要把文件名拼进去！
+        string[] searchDirs =
         {
-            return File.ReadAllBytes(path);
-        }
-        else
+        Path.Combine(Application.dataPath, "Lua"),
+        Path.Combine(Application.dataPath, "Lua/Libs"),
+        Path.Combine(Application.dataPath, "Lua/UI"),
+    };
+
+        // 4. 遍历所有目录去找 realPath + .lua
+        foreach (string dir in searchDirs)
         {
-            Debug.Log("CustomLoader重定向失败，文件名为" + filePath);
+            string fullPath = Path.Combine(dir, realPath + ".lua");
+
+            // 找到就直接返回，不打印任何日志
+            if (File.Exists(fullPath))
+            {
+                return File.ReadAllBytes(fullPath);
+            }
         }
+
+        // 5. 所有目录都找不到，才打印 1 次日志（不会重复打印）
+        Debug.LogWarning("CustomLoader 所有目录都找不到：" + filePath);
         return null;
     }
 
@@ -73,18 +87,8 @@ public class LuaMgr
     //打包时 要把lua文件后缀改为txt
     public byte[] CustomABLoader(ref string filePath)
     {
-        ////从AB包中加载文件
-        ////加载AB包
-        //string path = Path.Combine(Application.streamingAssetsPath, "lua");
-        //AssetBundle ab = AssetBundle.LoadFromFile(path);
-
-        ////加载Lua文件 返回
-        //TextAsset tx = ab.LoadAsset<TextAsset>(filePath + ".lua");
-        ////加载Lua文件 byte数组
-        //return tx.bytes;
-
         //通过之前写的AB包管理器 加载的lua脚本资源
-        TextAsset lua = ABMgr.Instance.LoadRes<TextAsset>("lua", filePath + ".lua");
+        TextAsset lua = ABMgr.Instance.LoadRes<TextAsset>("lua", filePath + ".lua.txt");
         if (lua != null)
             return lua.bytes;
         else

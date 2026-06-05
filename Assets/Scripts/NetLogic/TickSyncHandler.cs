@@ -114,7 +114,7 @@ public class TickSyncHandler
             _activePlayers.Add(id);
 
         _isRunning = true;
-
+       
         Debug.Log("【TickSyncHandler】帧同步启动，帧率：" + tickRate + "fps, 玩家数：" + _activePlayers.Count);
     }
 

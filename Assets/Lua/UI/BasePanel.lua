@@ -8,21 +8,33 @@ BasePanel.controls = {}
 BasePanel.isInitEvent = false
 -- 淡入淡出所需的CanvasGroup组件
 BasePanel.canvasGroup = nil
--- 淡入淡出动画协程
-BasePanel.fadeCoroutine = nil
+-- 淡入淡出动画状态（Update驱动，纯Lua实现）
+BasePanel.fadeUpdateId = nil
+BasePanel.fadeType = nil      -- "in" 或 "out"
+BasePanel.fadeElapsed = 0
+BasePanel.fadeDuration = 0.2
+BasePanel.fadeStartAlpha = 0
+BasePanel.fadeEndAlpha = 1
 
 function BasePanel:Init(name)
     if IsNull(self.panelObj) then
         -- 公共的实例化对象的方法
         self.panelObj = ABMgr:LoadRes("ui", name, typeof(GameObject))
-        self.panelObj.transform:SetParent(Canvas, false)
-        
+        if IsNull(self.panelObj) then
+            print("错误：AB包中找不到预制体 " .. name)
+            return
+        end
+        local canvasGo = GameObject.Find("Canvas")
+        if canvasGo ~= nil then
+            self.panelObj.transform:SetParent(canvasGo.transform, false)
+        end
+
         -- 添加CanvasGroup组件（如果还没有）
         self.canvasGroup = self.panelObj:GetComponent(typeof(CanvasGroup))
         if IsNull(self.canvasGroup) then
             self.canvasGroup = self.panelObj:AddComponent(typeof(CanvasGroup))
         end
-        
+
         -- GetComponentsInChildren
         -- 找所有UI控件 存起来
         local allControls = self.panelObj:GetComponentsInChildren(typeof(UIBehaviour))
@@ -32,35 +44,35 @@ function BasePanel:Init(name)
         -- Toggle togName
         -- Image imgName
         -- ScrollRect svName
+        -- Slider sldName
+        -- InputField inputName
         for i = 0, allControls.Length - 1 do
             local controlName = allControls[i].name
             if string.find(controlName, "btn") ~= nil or
                string.find(controlName, "tog") ~= nil or
                string.find(controlName, "img") ~= nil or
                string.find(controlName, "sv") ~= nil or
-               string.find(controlName, "txt") ~= nil
+               string.find(controlName, "txt") ~= nil or
+               string.find(controlName, "sld") ~= nil or
+               string.find(controlName, "input") ~= nil
             then
                 -- 为了让我们在得的时候 能够 确定得的控件类型 所以我们需要存储类型
                 -- 利用反射 Type 得到 控件的类名
-                local typeName = allControls[i]:GetType().Name               
-                
+                local typeName = allControls[i]:GetType().Name
+
                 -- 避免出现一个对象上 挂载多个UI控件 出现覆盖的问题
                 -- 都会被存到一个容器中 相当于像列表数组的形式
                 -- 最终存储形式
                 -- {
                 --    btnRole = { Image = 控件, Button = 控件},
                 --    togItem = { Toggle = 控件 }
-                -- }                
-                if self.controls then
-                    print("self.controls[controlName]:", self.controls[controlName])
-                end
-                
+                -- }
                 if self.controls[controlName] ~= nil then
-                    -- 通过自定义索引的形式 去加一个新的 “成员变量”
+                    -- 通过自定义索引的形式 去加一个新的 "成员变量"
                     self.controls[controlName][typeName] = allControls[i]
-                else                     
+                else
                     self.controls[controlName] = {[typeName] = allControls[i]}
-                end                
+                end
             end
         end
     end
@@ -81,37 +93,70 @@ end
 function BasePanel:ShowMe(name, fadeDuration)
     self:Init(name)
     self.panelObj:SetActive(true)
-    
-    fadeDuration = fadeDuration or 0.2  -- 默认淡入时间0.2秒
-    
+
+    fadeDuration = fadeDuration or 0.2
+
     -- 停止之前的淡入淡出动画
-    if self.fadeCoroutine then
-        self:StopCoroutine(self.fadeCoroutine)
-        self.fadeCoroutine = nil
-    end
-    
+    self:StopFade()
+
     -- 确保canvasGroup存在且初始alpha为0
     if self.canvasGroup then
         self.canvasGroup.alpha = 0
-        self.fadeCoroutine = self:StartCoroutine(self.FadeIn(fadeDuration))
+        -- 注册Update回调，驱动淡入
+        self.fadeType = "in"
+        self.fadeElapsed = 0
+        self.fadeDuration = fadeDuration
+        self.fadeStartAlpha = 0
+        self.fadeEndAlpha = 1
+        self.fadeUpdateId = RegisterUpdate(function(dt)
+            self:OnFadeUpdate(dt)
+        end)
     end
 end
 
 -- 带淡出效果的隐藏
 function BasePanel:HideMe(fadeDuration)
-    fadeDuration = fadeDuration or 0.2  -- 默认淡出时间0.2秒
-    
+    fadeDuration = fadeDuration or 0.2
+
     if self.canvasGroup and self.panelObj and self.panelObj.activeSelf then
         -- 停止之前的淡入淡出动画
-        if self.fadeCoroutine then
-            self:StopCoroutine(self.fadeCoroutine)
-            self.fadeCoroutine = nil
-        end
-        
-        self.fadeCoroutine = self:StartCoroutine(self.FadeOut(fadeDuration))
+        self:StopFade()
+
+        -- 注册Update回调，驱动淡出
+        self.fadeType = "out"
+        self.fadeElapsed = 0
+        self.fadeDuration = fadeDuration
+        self.fadeStartAlpha = self.canvasGroup.alpha
+        self.fadeEndAlpha = 0
+        self.fadeUpdateId = RegisterUpdate(function(dt)
+            self:OnFadeUpdate(dt)
+        end)
     else
-        -- 如果没有CanvasGroup或者面板已隐藏，直接隐藏
         if self.panelObj then
+            self.panelObj:SetActive(false)
+        end
+    end
+end
+
+-- 淡入淡出的每帧回调（由全局Update驱动）
+function BasePanel:OnFadeUpdate(dt)
+    self.fadeElapsed = self.fadeElapsed + dt
+    local t = self.fadeElapsed / self.fadeDuration
+    if t >= 1 then
+        t = 1
+    end
+    -- 使用平滑曲线
+    t = t * t * (3 - 2 * t)
+    self.canvasGroup.alpha = Mathf.Lerp(self.fadeStartAlpha, self.fadeEndAlpha, t)
+
+    -- 动画结束
+    if self.fadeElapsed >= self.fadeDuration then
+        self.canvasGroup.alpha = self.fadeEndAlpha
+        UnregisterUpdate(self.fadeUpdateId)
+        self.fadeUpdateId = nil
+        self.fadeType = nil
+        -- 淡出完成后隐藏物体
+        if self.fadeEndAlpha == 0 and self.panelObj then
             self.panelObj:SetActive(false)
         end
     end
@@ -119,65 +164,38 @@ end
 
 -- 立即显示（无动画）
 function BasePanel:ShowImmediate(name)
-    self:Init(name)
+    if self.panelObj and not self.panelObj.activeSelf then
+        self:HideImmediate()
+    end
+
+    if IsNull(self.panelObj) then
+        self:Init(name)
+    end
+
+    if IsNull(self.canvasGroup) and self.panelObj then
+        self.canvasGroup = self.panelObj:GetComponent(typeof(CanvasGroup))
+        if IsNull(self.canvasGroup) then
+            self.canvasGroup = self.panelObj:AddComponent(typeof(CanvasGroup))
+        end
+    end
+
     if self.canvasGroup then
         self.canvasGroup.alpha = 1
+    else
+        print("错误：无法获取 CanvasGroup，请检查面板预制体 " .. name)
     end
-    self.panelObj:SetActive(true)
+
+    if self.panelObj then
+        self.panelObj:SetActive(true)
+    end
 end
 
 -- 立即隐藏（无动画）
 function BasePanel:HideImmediate()
-    -- 停止所有动画协程
-    if self.fadeCoroutine then
-        self:StopCoroutine(self.fadeCoroutine)
-        self.fadeCoroutine = nil
-    end
+    self:StopFade()
     if self.panelObj then
         self.panelObj:SetActive(false)
     end
-end
-
--- 淡入协程
-function BasePanel:FadeIn(duration)
-    local elapsed = 0
-    local startAlpha = self.canvasGroup.alpha
-    local endAlpha = 1
-    
-    while elapsed < duration do
-        elapsed = elapsed + Time.deltaTime
-        local t = elapsed / duration
-        -- 使用平滑曲线
-        t = t * t * (3 - 2 * t)
-        self.canvasGroup.alpha = Mathf.Lerp(startAlpha, endAlpha, t)
-        coroutine.yield(0)
-    end
-    
-    self.canvasGroup.alpha = endAlpha
-    self.fadeCoroutine = nil
-end
-
--- 淡出协程
-function BasePanel:FadeOut(duration)
-    local elapsed = 0
-    local startAlpha = self.canvasGroup.alpha
-    local endAlpha = 0
-    
-    while elapsed < duration do
-        elapsed = elapsed + Time.deltaTime
-        local t = elapsed / duration
-        -- 使用平滑曲线
-        t = t * t * (3 - 2 * t)
-        self.canvasGroup.alpha = Mathf.Lerp(startAlpha, endAlpha, t)
-        coroutine.yield(0)
-    end
-    
-    self.canvasGroup.alpha = endAlpha
-    -- 淡出完成后隐藏物体
-    if self.panelObj then
-        self.panelObj:SetActive(false)
-    end
-    self.fadeCoroutine = nil
 end
 
 -- 设置透明度（0-1）
@@ -197,13 +215,14 @@ end
 
 -- 判断是否正在播放动画
 function BasePanel:IsFading()
-    return self.fadeCoroutine ~= nil
+    return self.fadeUpdateId ~= nil
 end
 
 -- 停止当前动画
 function BasePanel:StopFade()
-    if self.fadeCoroutine then
-        self:StopCoroutine(self.fadeCoroutine)
-        self.fadeCoroutine = nil
+    if self.fadeUpdateId then
+        UnregisterUpdate(self.fadeUpdateId)
+        self.fadeUpdateId = nil
+        self.fadeType = nil
     end
 end

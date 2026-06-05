@@ -8,19 +8,27 @@ public class LuaCopyEditor : Editor
     [MenuItem("XLua/自动生成txt后缀的Lua")]
     public static void CopyLuaToTxt()
     {
+        // ★★★ 可拓展 ★★★
         // 首先要找到 我们的所有Lua文件
         string path = Path.Combine(Application.dataPath, "Lua");
         string libsPath = Path.Combine(path, "Libs");
+        string uiPath = Path.Combine(path, "UI");
+
+        // ★★★ 可拓展 ★★★
         //判断路径是否存在
         if (!Directory.Exists(path))
-            return;
-        
+            return;        
         if (!Directory.Exists(libsPath))
             return;
+        if (!Directory.Exists(uiPath))
+            return;
 
+
+        // ★★★ 可拓展 ★★★
         //得到每一个lua文件的路径 才能进行迁移拷贝
         string[] strs = Directory.GetFiles(path, "*.lua");
         string[] libsStrs = Directory.GetFiles(libsPath, "*.lua");
+        string[] uiStrs = Directory.GetFiles(uiPath, "*.lua");
 
         // 然后把Lua文件拷贝到一个新的文件夹中
         // 首先定一个新路径
@@ -42,6 +50,8 @@ public class LuaCopyEditor : Editor
         
         List<string> newFileNames = new List<string>();
         string fileName;
+
+        // ★★★ 可拓展 ★★★
         for (int i = 0; i < strs.Length; i++)
         {
             //得到新的文件路径 用于拷贝
@@ -57,6 +67,14 @@ public class LuaCopyEditor : Editor
             fileName = newPath + libsStrs[i].Substring(libsStrs[i].LastIndexOf("\\")) + ".txt";
             newFileNames.Add(fileName);
             File.Copy(libsStrs[i], fileName);
+        }
+
+        for (int i = 0; i < uiStrs.Length; i++)
+        {
+            //得到新的文件路径 用于拷贝
+            fileName = newPath + uiStrs[i].Substring(uiStrs[i].LastIndexOf("\\")) + ".txt";
+            newFileNames.Add(fileName);
+            File.Copy(uiStrs[i], fileName);
         }
 
         AssetDatabase.Refresh();
