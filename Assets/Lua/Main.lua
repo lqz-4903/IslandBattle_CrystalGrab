@@ -17,10 +17,23 @@ require("UI.AboutPanel")
 require("UI.ChangeNamePanel")
 require("UI.PlayExplainPanel")
 require("UI.BeginPanel")
+require("UI.GamePanel")
 
+-- 场景初始化（由GameEntry.Start每场景调用，也在此首次执行）
+function OnSceneLoaded()
+    local sceneName = CS.UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
+    print("OnSceneLoaded: " .. sceneName)
+    if sceneName == "BeginScene" then
+        BeginBKPanel:Show()
+        BeginPanel:Show()
+    elseif sceneName == "GameScene" then
+        GamePanel:Show()
+    else
+        print("未知场景: " .. sceneName)
+    end
+end
 
-
-
+OnSceneLoaded()
 
 
 BeginBKPanel:Show()

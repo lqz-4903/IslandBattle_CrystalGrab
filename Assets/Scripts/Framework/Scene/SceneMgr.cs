@@ -1,3 +1,4 @@
+﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -60,7 +61,7 @@ public class SceneMgr : MonoBehaviour
         StartCoroutine(LoadSceneAsyncCoroutine(sceneName));
     }
 
-    private System.Collections.IEnumerator LoadSceneAsyncCoroutine(string sceneName)
+    private IEnumerator LoadSceneAsyncCoroutine(string sceneName)
     {
         AsyncOperation op = SceneManager.LoadSceneAsync(sceneName);
         while (!op.isDone)

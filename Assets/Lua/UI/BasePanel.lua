@@ -38,17 +38,34 @@ function BasePanel:Init(name)
         -- GetComponentsInChildren
         -- 找所有UI控件 存起来
         local allControls = self.panelObj:GetComponentsInChildren(typeof(UIBehaviour))
-        -- 优化：关闭所有Text和不需要交互的Image的RaycastTarget
+        -- 优化：关闭不需要交互的控件的RaycastTarget
         for i = 0, allControls.Length - 1 do
             local ctrl = allControls[i]
             local typeName = ctrl:GetType().Name
-            -- Text一律关掉，Image只保留btn/tog前缀的
+            local ctrlName = ctrl.name
             if typeName == "Text" then
+                -- Text一律关掉
                 ctrl.raycastTarget = false
-            elseif typeName == "Image" and
-                   string.find(ctrl.name, "btn") == nil and
-                   string.find(ctrl.name, "tog") == nil then
-                ctrl.raycastTarget = false
+            elseif typeName == "Image" then
+                -- 保留可交互控件自身的Image（btn/tog/sld/input前缀）
+                local keepRaycast = string.find(ctrlName, "btn") ~= nil or
+                                    string.find(ctrlName, "tog") ~= nil or
+                                    string.find(ctrlName, "sld") ~= nil or
+                                    string.find(ctrlName, "input") ~= nil
+                -- 也保留Toggle/Slider等交互控件的子Image（如Background、Checkmark、Handle）
+                if not keepRaycast then
+                    local parent = ctrl.transform.parent
+                    if parent ~= nil then
+                        local toggle = parent:GetComponent(typeof(CS.UnityEngine.UI.Toggle))
+                        local slider = parent:GetComponent(typeof(CS.UnityEngine.UI.Slider))
+                        if toggle ~= nil or slider ~= nil then
+                            keepRaycast = true
+                        end
+                    end
+                end
+                if not keepRaycast then
+                    ctrl.raycastTarget = false
+                end
             end
         end
         -- 如果存入一些对于我们来说没用UI控件

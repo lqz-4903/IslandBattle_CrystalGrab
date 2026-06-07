@@ -1,15 +1,15 @@
 ManifestFileVersion: 0
-CRC: 3015178497
+CRC: 1435011023
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: fe2b44e8881d6cabb97087dfe3fb0669
+    Hash: a50adcb71f473bb0ac5d5b259c4579a5
   TypeTreeHash:
     serializedVersion: 2
     Hash: 2a7edac6dda793966f9c70ac9a697a7a
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: fe2b44e8881d6cabb97087dfe3fb0669
+    Hash: a50adcb71f473bb0ac5d5b259c4579a5
 HashAppended: 0
 ClassTypes:
 - Class: 1
@@ -98,16 +98,18 @@ SerializeReferenceClassIdentifiers:
 - AssemblyName: UnityEngine.UI
   ClassName: UnityEngine.UI.Toggle/ToggleEvent
 Assets:
-- Assets/ABRes/Prefabs/UI/BeginBKPanel.prefab
-- Assets/ABRes/Prefabs/UI/AboutPanel.prefab
-- Assets/ABRes/Prefabs/UI/ChangeNamePanel.prefab
-- Assets/ABRes/Prefabs/UI/PlayExplainPanel.prefab
-- Assets/ABRes/Prefabs/UI/CreateRoomPanel.prefab
-- Assets/ABRes/Prefabs/UI/SettingPanel.prefab
-- Assets/ABRes/Prefabs/UI/TipPanel.prefab
+- Assets/Resources/UI/BeginSceneUI/BeginBKPanel.prefab
+- Assets/Resources/UI/BeginSceneUI/AboutPanel.prefab
+- Assets/Resources/UI/BeginSceneUI/ChangeNamePanel.prefab
+- Assets/Resources/UI/BeginSceneUI/PlayExplainPanel.prefab
+- Assets/Resources/UI/BeginSceneUI/CreateRoomPanel.prefab
+- Assets/Resources/UI/BeginSceneUI/SettingPanel.prefab
+- Assets/Resources/UI/TipPanel.prefab
+- Assets/Resources/UI/GameSceneUI/GamePanel.prefab
+- Assets/Resources/UI/GameSceneUI/GameOverPanel.prefab
 - Assets/ArtRes/BeginPanelBK.png
-- Assets/ABRes/Prefabs/UI/ChooseRoomPanel.prefab
-- Assets/ABRes/Prefabs/UI/BeginPanel.prefab
-- Assets/ABRes/Prefabs/UI/txtPlayer.prefab
-- Assets/ABRes/Prefabs/UI/JoinRoomPanel.prefab
+- Assets/Resources/UI/BeginSceneUI/ChooseRoomPanel.prefab
+- Assets/Resources/UI/BeginSceneUI/BeginPanel.prefab
+- Assets/Resources/UI/BeginSceneUI/txtPlayer.prefab
+- Assets/Resources/UI/BeginSceneUI/JoinRoomPanel.prefab
 Dependencies: []

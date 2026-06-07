@@ -248,6 +248,17 @@ public static class ExampleConfig
     //}
     //--------------end 热补丁自动化配置-------------------------
 
+    // Lua中可用的C#委托类型（Lua function可自动转换为此类型）
+    [CSharpCallLua]
+    public static List<Type> CSharpCallLua = new List<Type>()
+    {
+        typeof(UnityEngine.Events.UnityAction<bool>),
+        typeof(UnityEngine.Events.UnityAction<float>),
+        typeof(UnityEngine.Events.UnityAction),
+        typeof(UnityEngine.Events.UnityAction<string>),
+        typeof(UnityEngine.Events.UnityAction<int>),
+    };
+
     //黑名单
     [BlackList]
     public static List<List<string>> BlackList = new List<List<string>>()  {

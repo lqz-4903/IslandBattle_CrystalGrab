@@ -58,10 +58,10 @@ function ChangeNamePanel:BindEvents()
         end)
     end
 
-    -- 关闭按钮：不保存，直接关闭
-    local btnClose = self:GetControl("btnClose", "Button")
-    if btnClose ~= nil then
-        btnClose.onClick:AddListener(function()
+    -- 取消按钮：不保存，直接关闭
+    local btnCancel = self:GetControl("btnCancel", "Button")
+    if btnCancel ~= nil then
+        btnCancel.onClick:AddListener(function()
             self:Close()
         end)
     end
