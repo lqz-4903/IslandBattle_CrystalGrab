@@ -24,12 +24,14 @@ public class GameEventHandler
 
     #region =============== 配置 ===============
 
-    // 水晶生成间隔（秒）
-    private const float CrystalSpawnInterval = 5f;
+    // 水晶生成间隔（秒）—— 确定性定点数
+    private static readonly Fix64 CrystalSpawnInterval = Fix64.FromInt(5);
     // 最大同时存在水晶数
     private const int MaxCrystals = 5;
     // 胜利所需分数
     private const int DefaultWinScore = 10;
+    // 默认游戏时长（秒）—— 确定性定点数
+    private static readonly Fix64 DefaultGameDuration = Fix64.FromInt(120);
 
     #endregion
 
@@ -38,7 +40,7 @@ public class GameEventHandler
     // 是否正在运行
     private bool _isRunning;
     // 晶石生成计时器
-    private float _crystalSpawnTimer;
+    private Fix64 _crystalSpawnTimer;
     // 下一个晶石ID
     private int _nextCrystalId = 1;
     // 获胜分数
@@ -55,14 +57,20 @@ public class GameEventHandler
     // 玩家生命值：playerId -> hp
     private Dictionary<int, int> _playerHPs = new();
 
+    // 游戏倒计时（使用 Fix64 保证跨平台确定性）
+    private Fix64 _gameTimer;
+    // 上次广播倒计时的时间（用于控制广播频率，每秒一次）
+    private Fix64 _lastBroadcastTime;
+
     #endregion
 
     #region =============== 内部数据结构 ===============
 
+    /// <summary>水晶数据（内部使用 Fix64 保证确定性）</summary>
     private struct CrystalData
     {
         public int CrystalId;
-        public float PosX, PosY, PosZ;
+        public Fix64 PosX, PosY, PosZ;
     }
 
 
@@ -84,16 +92,23 @@ public class GameEventHandler
     /// </summary>
     /// <param name="randomSeed"> 随机种子（从GameStart开始） </param>
     /// <param name="targetScore"> 胜利分数 （从GameStart开始）</param>
-    public void StartGameLoop(int randomSeed, int targetScore = DefaultWinScore)
+    /// <param name="gameDuration"> 游戏时长（秒）</param>
+    public void StartGameLoop(int randomSeed, int targetScore = DefaultWinScore, Fix64 gameDuration = default)
     {
+        if (gameDuration.Raw == 0) gameDuration = DefaultGameDuration;
+
         _isRunning = true;
-        _crystalSpawnTimer = 0f;
+        _crystalSpawnTimer = Fix64.Zero;
         _nextCrystalId = 1;
         _winScore = targetScore;
         _rng = new DeterministicRandom(randomSeed);
         _activeCrystals.Clear();
         _playerScores.Clear();
         _playerHPs.Clear();
+
+        // 初始化游戏计时器（Fix64）
+        _gameTimer = gameDuration;
+        _lastBroadcastTime = gameDuration;
 
         var room = _host.CurrentRoom;
         if (room != null)
@@ -105,7 +120,10 @@ public class GameEventHandler
             }
         }
 
-        Debug.Log("【GameEventHandler】启动 seed：" + randomSeed + "目标分数：" + targetScore);
+        Debug.Log("【GameEventHandler】启动 seed：" + randomSeed + " 目标分数：" + targetScore + " 游戏时长：" + gameDuration.ToFloat() + "秒");
+
+        // 立即广播一次初始倒计时
+        BroadcastTimerUpdate();
     }
 
     /// <summary>
@@ -121,9 +139,27 @@ public class GameEventHandler
 
     #region =============== Tick (HostServer.Update 驱动) ===============
 
-    public void Tick(float deltaTime)
+    /// <summary>每帧 Tick，deltaTime 为 Fix64 确定性时间增量</summary>
+    public void Tick(Fix64 deltaTime)
     {
         if (!_isRunning) return;
+
+        // 游戏倒计时（服务端权威，不受玩家断线影响）
+        _gameTimer -= deltaTime;
+        if (_gameTimer <= Fix64.Zero)
+        {
+            _gameTimer = Fix64.Zero;
+            BroadcastTimerUpdate();
+            OnTimerEnd();
+            return;
+        }
+
+        // 每秒广播一次倒计时给所有客户端
+        if (_lastBroadcastTime - _gameTimer >= Fix64.One)
+        {
+            _lastBroadcastTime = _gameTimer;
+            BroadcastTimerUpdate();
+        }
 
         // 水晶定时生成
         _crystalSpawnTimer += deltaTime;
@@ -132,12 +168,25 @@ public class GameEventHandler
             _crystalSpawnTimer -= CrystalSpawnInterval;
             if (_activeCrystals.Count < MaxCrystals)
             {
-                // 生成水晶
                 SpawnCrystal();
             }
         }
-
     }
+
+    /// <summary>
+    /// 广播倒计时更新给所有客户端（含房主本机）。
+    /// 注意：protobuf 的 RemainingTime 是 float，不能做确定性模拟，
+    /// 此处仅用于客户端 UI 显示，不参与游戏逻辑。
+    /// </summary>
+    private void BroadcastTimerUpdate()
+    {
+        var msg = new GameTimerUpdate { RemainingTime = _gameTimer.ToFloat() };
+        _host.BroadcastToAll(new NetMessage { GameTimerUpdate = msg });
+        EventCenter.Dispatch(36, msg);
+    }
+
+    /// <summary>获取当前剩余时间（供外部查询，返回 Fix64）</summary>
+    public Fix64 RemainingTime => _gameTimer;
 
     #endregion
 
@@ -344,10 +393,17 @@ public class GameEventHandler
     {
         Debug.Log("【GameEventHandler】游戏结束 胜者：" + winnerId);
 
-        var gameEnd = new GameEnd { WinnerId = winnerId };
+        // 查找胜者名字
+        string winnerName = "未知";
+        var room = _host.CurrentRoom;
+        if (room != null && room.IdToPlayer.TryGetValue(winnerId, out var player))
+        {
+            winnerName = player.PlayerName;
+        }
+
+        var gameEnd = new GameEnd { WinnerId = winnerId, WinnerName = winnerName };
 
         // scores：按 playerId 从 1 开始依次添加
-        var room = _host.CurrentRoom;
         if (room != null)
         {
             foreach (int playerId in room.GetAllPlayerIds())
@@ -357,10 +413,37 @@ public class GameEventHandler
             }
         }
 
+        // 1.发给远程客户端
         _host.BroadcastToAll(new NetMessage { GameEnd = gameEnd });
+        // 2.房主本机也收到
+        EventCenter.Dispatch(34, gameEnd);
 
         _isRunning = false;
         _host.OnGameEnded();
+    }
+
+    /// <summary>
+    /// 倒计时结束：按分数决定胜者
+    /// </summary>
+    private void OnTimerEnd()
+    {
+        Debug.Log("【GameEventHandler】倒计时结束，按分数决定胜者");
+
+        // 找出得分最高的玩家
+        int winnerId = -1;
+        int maxScore = -1;
+
+        foreach (var kvp in _playerScores)
+        {
+            if (kvp.Value > maxScore)
+            {
+                maxScore = kvp.Value;
+                winnerId = kvp.Key;
+            }
+        }
+
+        // 没有玩家时默认-1
+        EndGame(winnerId);
     }
 
     #endregion
@@ -375,4 +458,4 @@ public class GameEventHandler
 
     #endregion
 }
-// TODO 水晶生成位置待处理 156 - 174
+// TODO 水晶生成位置待处理 205-222

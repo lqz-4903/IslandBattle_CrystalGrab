@@ -15,12 +15,14 @@ public class DeterministicRandom
     /// <summary>返回 [0, max) 的整数</summary>
     public int Next(int max)
     {
+        if (max <= 0) return 0;
         return (int)(NextUInt() % (uint)max);
     }
 
     /// <summary>返回 [min, max) 的整数</summary>
     public int Next(int min, int max)
     {
+        if (max <= min) return min;
         return min + Next(max - min);
     }
 

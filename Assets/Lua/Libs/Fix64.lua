@@ -24,12 +24,15 @@ function Fix64.fromFloat(f)
     return Fix64.new(math.floor(f * ONE))
 end
 
--- 常量
+-- 常量（PI 使用预计算 raw 值，避免 fromFloat 的浮点舍入误差）
+-- PI ≈ 3.14159265358979 → raw = 3.14159265358979 * 2^32 ≈ 13493037705
+local PI_RAW = 13493037705
+
 Fix64.ZERO = Fix64.new(0)
 Fix64.ONE  = Fix64.fromInt(1)
 Fix64.TWO  = Fix64.fromInt(2)
 Fix64.HALF = Fix64.new(HALF)
-Fix64.PI   = Fix64.fromFloat(3.14159265358979)
+Fix64.PI   = Fix64.new(PI_RAW)
 
 -- ========== 运算符重载 ==========
 function Fix64.__add(a, b)
@@ -51,10 +54,12 @@ function Fix64.__mul(a, b)
     return Fix64.new(res)
 end
 
+-- 除法：用恒等式 (a ÷ b) * ONE + ((a % b) * ONE) / b 分解，避免 (a * ONE) 溢出 Lua 53 位整数精度
 function Fix64.__div(a, b)
     if b.raw == 0 then error("Fix64 divide by zero") end
-    return Fix64.new((a.raw / b.raw) * ONE) -- 简化写法，Lua数字精度足够处理这个逻辑
-    -- 注：为了极致精确，生产环境常用 a.raw * ONE / b.raw，但注意Lua数字大小限制
+    local intPart = math.floor(a.raw / b.raw)
+    local remainder = a.raw % b.raw
+    return Fix64.new(intPart * ONE + math.floor(remainder * ONE / b.raw))
 end
 
 function Fix64.__mod(a, b)
@@ -82,15 +87,38 @@ function Fix64.toFloat(a)
     return a.raw / ONE
 end
 
--- 牛顿迭代开方
+-- 开方：二进制逐位开方（纯整数运算，跨平台完全确定性，不依赖 math.sqrt）
 function Fix64.sqrt(a)
     if a.raw < 0 then error("Sqrt negative") end
     if a.raw == 0 then return Fix64.ZERO end
-    -- 使用Lua原生开方再转回来足够精确且不破坏确定性
-    -- (因为只在物理逻辑内使用，只要Lua自身math.sqrt确定就行，通常都是IEEE754标准)
-    -- 如果追求极致绝对确定性，可在这里手写位运算开方，但太长了。
-    local val = math.sqrt(a.raw / ONE)
-    return Fix64.fromFloat(val)
+
+    local x = a.raw
+    local result = 0
+
+    -- 起始位：对齐到 x 的最高位附近（小数部分 32 位 + 整数 30 位余量）
+    local bit = 2 ^ (FRAC_BITS + 30)
+    while bit > x do
+        bit = bit >> 2
+    end
+
+    while bit ~= 0 do
+        local sum = result + bit
+        if x >= sum then
+            x = x - sum
+            result = (result >> 1) + bit
+        else
+            result = result >> 1
+        end
+        bit = bit >> 2
+    end
+
+    -- Newton 精修 1 轮（安全分解，避免 a.raw * ONE 溢出）
+    local quot = math.floor(a.raw / result)
+    local rem = a.raw % result
+    local div = quot * ONE + math.floor(rem * ONE / result)
+    result = (result + div) >> 1
+
+    return Fix64.new(result)
 end
 
 function Fix64.abs(a)

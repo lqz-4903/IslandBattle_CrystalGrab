@@ -15,7 +15,7 @@ require("Custom_NickName")
 -- 判空
 require("IsNull")
 
------ 全局Update驱动（由C#侧GameEntry.Update每帧调用）
+----- 全局Update驱动（由C#侧GameMgr.Update每帧调用）
 -- 回调表：{key = callbackFunc}
 local updateCallbacks = {}
 local nextId = 0

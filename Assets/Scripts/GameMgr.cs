@@ -1,0 +1,107 @@
+﻿using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public class GameMgr : MonoBehaviour
+{
+    private static GameMgr _instance;
+    public static GameMgr Instance
+    {
+        get
+        {
+            if (_instance == null)
+            {
+                // 优先查找场景中已存在的 GameMgr
+                _instance = FindObjectOfType<GameMgr>();
+                if (_instance == null)
+                {
+                    GameObject go = new GameObject("GameMgr");
+                    _instance = go.AddComponent<GameMgr>();
+                    DontDestroyOnLoad(go);
+                }
+            }
+            return _instance;
+        }
+    }
+
+    private XLua.LuaFunction luaUpdate;
+    private XLua.LuaFunction luaOnSceneLoaded;
+
+    void Awake()
+    {
+        // 单例检测：如果已存在实例（来自之前的场景），销毁当前场景中的重复对象
+        if (_instance != null && _instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        _instance = this;
+        DontDestroyOnLoad(gameObject);
+
+        // 从代码创建 Canvas / EventSystem / UICamera（幂等，仅首次生效）
+        SceneMgr.Instance.Init();
+    }
+
+    void Start()
+    {
+        LuaMgr.Instance.Init();
+        LuaMgr.Instance.DoString("Main");
+
+        // 提前初始化 GameTimerManager，确保场景切换后能接收服务端倒计时消息
+        _ = GameTimerManager.Instance;
+
+        // 获取Lua侧函数引用
+        luaOnSceneLoaded = LuaMgr.Instance.Global.Get<XLua.LuaFunction>("OnSceneLoaded");
+        luaUpdate = LuaMgr.Instance.Global.Get<XLua.LuaFunction>("Update");
+
+        // 注册场景加载回调（切场景时自动调用Lua侧OnSceneLoaded）
+        SceneManager.sceneLoaded += OnSceneLoadedCallback;
+
+        // 首次加载也触发一次
+        if (luaOnSceneLoaded != null)
+            luaOnSceneLoaded.Call();
+    }
+
+    /// <summary>
+    /// 场景加载完成回调
+    /// </summary>
+    void OnSceneLoadedCallback(Scene scene, LoadSceneMode mode)
+    {
+        if (luaOnSceneLoaded != null)
+            luaOnSceneLoaded.Call();
+    }
+
+    private float _luaGCTimer;
+
+    void Update()
+    {
+        // 每帧驱动Lua侧的Update，传入deltaTime
+        if (luaUpdate != null)
+            luaUpdate.Action(Time.deltaTime);
+
+        // Lua GC 每秒触发一次（而非每帧），减少 GC 压力
+        _luaGCTimer += Time.deltaTime;
+        if (_luaGCTimer >= 1.0f)
+        {
+            _luaGCTimer -= 1.0f;
+            LuaMgr.Instance.Tick();
+        }
+    }
+
+    void OnDestroy()
+    {
+        // 注销场景回调
+        SceneManager.sceneLoaded -= OnSceneLoadedCallback;
+
+        if (luaUpdate != null)
+        {
+            luaUpdate.Dispose();
+            luaUpdate = null;
+        }
+        if (luaOnSceneLoaded != null)
+        {
+            luaOnSceneLoaded.Dispose();
+            luaOnSceneLoaded = null;
+        }
+    }
+}

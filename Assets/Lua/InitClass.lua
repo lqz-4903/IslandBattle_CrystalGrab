@@ -14,27 +14,62 @@ require("Official_NickName")
 require("Custom_NickName")
 -- 判空
 require("IsNull")
+-- 确定性随机数
+DeterministicRandom = require("DeterministicRandom")
 
------ 全局Update驱动（由C#侧GameEntry.Update每帧调用）
--- 回调表：{key = callbackFunc}
-local updateCallbacks = {}
-local nextId = 0
+----- 全局Update驱动（由C#侧GameMgr.Update每帧调用）
+-- ★ 优化：使用数组+稀疏标记替代 pairs() 迭代，避免每帧分配迭代器
+--   RegisterUpdate 返回的 id 是数组下标，UnregisterUpdate 将槽位置为 nil
+--   Update 时用数值 for + rawget 跳过 nil 槽位（pairless iteration）
+local updateCallbacks = {}     -- [id] = callback
+local updateNextId = 0          -- 单调递增ID分配器
+local updateNeedCompact = false -- 是否需要压缩数组
 
--- 注册一个每帧回调，返回id（用于注销）
 function RegisterUpdate(callback)
-    nextId = nextId + 1
-    updateCallbacks[nextId] = callback
-    return nextId
+    updateNextId = updateNextId + 1
+    updateCallbacks[updateNextId] = callback
+    return updateNextId
 end
 
--- 注销一个每帧回调
 function UnregisterUpdate(id)
-    updateCallbacks[id] = nil
+    if updateCallbacks[id] ~= nil then
+        updateCallbacks[id] = nil
+        updateNeedCompact = true
+    end
 end
 
--- 全局Update，由C#侧调用，dt为Time.deltaTime
 function Update(dt)
-    for id, callback in pairs(updateCallbacks) do
-        callback(dt)
+    -- 数值 for 循环（无迭代器分配）
+    for i = 1, updateNextId do
+        local callback = updateCallbacks[i]
+        if callback ~= nil then
+            callback(dt)
+        end
+    end
+
+    -- 定期压缩稀疏数组（nil 槽位过多时）
+    if updateNeedCompact then
+        local nilCount = 0
+        for i = 1, updateNextId do
+            if updateCallbacks[i] == nil then
+                nilCount = nilCount + 1
+            end
+        end
+        -- nil 槽位超过一半时重建数组
+        if nilCount > updateNextId / 2 then
+            local newCallbacks = {}
+            local newId = 0
+            for i = 1, updateNextId do
+                local cb = updateCallbacks[i]
+                if cb ~= nil then
+                    newId = newId + 1
+                    newCallbacks[newId] = cb
+                end
+            end
+            -- 替换全局表
+            updateCallbacks = newCallbacks
+            updateNextId = newId
+        end
+        updateNeedCompact = false
     end
 end

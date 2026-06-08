@@ -56,10 +56,15 @@ public static class EventCenter
 
         lock (_eventStringDic)
         {
-            if (_eventStringDic.ContainsKey(name))            
-                (_eventStringDic[name] as UnityAction_package<T>).actions += action;            
-            else            
-                _eventStringDic.Add(name, new UnityAction_package<T>(action));            
+            if (_eventStringDic.TryGetValue(name, out var wrapper) &&
+                wrapper is UnityAction_package<T> typedWrapper)
+            {
+                typedWrapper.actions += action;
+            }
+            else
+            {
+                _eventStringDic[name] = new UnityAction_package<T>(action);
+            }
         }
     }
 
@@ -74,10 +79,15 @@ public static class EventCenter
 
         lock (_eventStringDic)
         {
-            if (_eventStringDic.ContainsKey(name))            
-                (_eventStringDic[name] as UnityAction_package).actions += action;            
-            else            
-                _eventStringDic.Add(name, new UnityAction_package(action));            
+            if (_eventStringDic.TryGetValue(name, out var wrapper) &&
+                wrapper is UnityAction_package typedWrapper)
+            {
+                typedWrapper.actions += action;
+            }
+            else
+            {
+                _eventStringDic[name] = new UnityAction_package(action);
+            }
         }
     }
 
@@ -141,15 +151,12 @@ public static class EventCenter
 
         lock (_eventStringDic)
         {
-            if (_eventStringDic.TryGetValue(name, out var wrapper))
+            if (_eventStringDic.TryGetValue(name, out var wrapper) &&
+                wrapper is UnityAction_package<T> typedWrapper)
             {
-                var actions = (wrapper as UnityAction_package<T>).actions;
-                actions -= action;
-                // 如果没有监听了，就移除键，避免内存垃圾
-                if (actions == null)
+                typedWrapper.actions -= action;
+                if (typedWrapper.actions == null)
                     _eventStringDic.Remove(name);
-                else
-                    (wrapper as UnityAction_package<T>).actions = actions;
             }
         }
     }
@@ -165,15 +172,12 @@ public static class EventCenter
 
         lock (_eventStringDic)
         {
-            if (_eventStringDic.TryGetValue(name, out var wrapper))
+            if (_eventStringDic.TryGetValue(name, out var wrapper) &&
+                wrapper is UnityAction_package typedWrapper)
             {
-                var actions = (wrapper as UnityAction_package).actions;
-                actions -= action;
-                // 如果没有监听了，就移除键
-                if (actions == null)
+                typedWrapper.actions -= action;
+                if (typedWrapper.actions == null)
                     _eventStringDic.Remove(name);
-                else
-                    (wrapper as UnityAction_package).actions = actions;
             }
         }
     }
@@ -244,11 +248,14 @@ public static class EventCenter
     public static void Dispatch<T>(string name, T info)
     {
         UnityAction<T> actions = null;
-        
+
         lock (_eventStringDic)
         {
-            if (_eventStringDic.TryGetValue(name, out var wrapper))            
-                actions = (wrapper as UnityAction_package<T>).actions;            
+            if (_eventStringDic.TryGetValue(name, out var wrapper) &&
+                wrapper is UnityAction_package<T> typedWrapper)
+            {
+                actions = typedWrapper.actions;
+            }
         }
 
         if (actions != null)
@@ -271,11 +278,14 @@ public static class EventCenter
     public static void Dispatch(string name)
     {
         UnityAction actions = null;
-        
+
         lock (_eventStringDic)
         {
-            if (_eventStringDic.TryGetValue(name, out var wrapper))            
-                actions = (wrapper as UnityAction_package).actions;            
+            if (_eventStringDic.TryGetValue(name, out var wrapper) &&
+                wrapper is UnityAction_package typedWrapper)
+            {
+                actions = typedWrapper.actions;
+            }
         }
 
         if (actions != null)

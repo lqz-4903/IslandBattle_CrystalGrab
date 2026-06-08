@@ -40,8 +40,8 @@ public class TickSyncHandler
     // 逻辑帧率（帧/秒）
     private const int DefaultTickRate = 15;
 
-    // 等待单帧输入的最大时间（秒），超时用空输入填充
-    private const float MaxWaitTime = 0.1f;
+    // 等待单帧输入的最大时间（使用 Fix64 确定性比较）
+    private static readonly Fix64 MaxWaitTime = Fix64.FromFloat(0.1f);
 
     // 保留的帧历史数量（用于断线重连）
     private const int MaxTickHistory = 1500; // 约100秒 @ 15fps
@@ -53,14 +53,14 @@ public class TickSyncHandler
     // 当前逻辑帧号
     private int _currentTick;
 
-    // 每帧时间间隔
-    private float _tickInterval;
+    // 每帧时间间隔（Fix64 确定性）
+    private Fix64 _tickInterval;
 
-    // 帧累计计时器
-    private float _tickTimer;
+    // 帧累计计时器（Fix64 确定性）
+    private Fix64 _tickTimer;
 
-    // 当前帧等待输入的计时器
-    private float _waitTimer;
+    // 当前帧等待输入的计时器（Fix64 确定性）
+    private Fix64 _waitTimer;
 
     // 是否正在运行
     private bool _isRunning;
@@ -101,10 +101,10 @@ public class TickSyncHandler
     /// <param name="playerIds"></param>
     public void StartTickLoop(int[] playerIds, int tickRate = DefaultTickRate)
     {
-        _tickInterval = 1f / tickRate;
+        _tickInterval = Fix64.One / Fix64.FromInt(tickRate);
         _currentTick = 0;
-        _tickTimer = 0f;
-        _waitTimer = 0f;
+        _tickTimer = Fix64.Zero;
+        _waitTimer = Fix64.Zero;
         _isWaitingForInput = false;
         _activePlayers.Clear();
         _currentTickInputs.Clear();
@@ -114,8 +114,8 @@ public class TickSyncHandler
             _activePlayers.Add(id);
 
         _isRunning = true;
-       
-        Debug.Log("【TickSyncHandler】帧同步启动，帧率：" + tickRate + "fps, 玩家数：" + _activePlayers.Count);
+
+        Debug.Log("【TickSyncHandler】帧同步启动，帧率：" + tickRate + "fps, 间隔：" + _tickInterval.ToFloat() + "s, 玩家数：" + _activePlayers.Count);
     }
 
     /// <summary>
@@ -135,7 +135,8 @@ public class TickSyncHandler
     /// 每帧调用，驱动帧同步逻辑
     /// </summary>
     /// <param name="deltaTime"></param>
-    public void Tick(float deltaTime)
+    /// <summary>每帧驱动，deltaTime 为 Fix64 确定性时间增量</summary>
+    public void Tick(Fix64 deltaTime)
     {
         if (!_isRunning) return;
 
@@ -146,7 +147,6 @@ public class TickSyncHandler
             if (_tickTimer >= _tickInterval)
             {
                 _tickTimer -= _tickInterval;
-                // 开启新的一帧
                 BeginNewTick();
             }
             return;
@@ -166,7 +166,6 @@ public class TickSyncHandler
         }
 
         if (allRecved || _waitTimer >= MaxWaitTime)
-            // 结束当前帧
             FinalizeTick();
     }
 
@@ -182,7 +181,7 @@ public class TickSyncHandler
     {
         _currentTick++;
         _currentTickInputs.Clear();
-        _waitTimer = 0f;
+        _waitTimer = Fix64.Zero;
         _isWaitingForInput = true;
     }
 
@@ -258,7 +257,11 @@ public class TickSyncHandler
     /// <param name="skill"></param>
     /// <param name="cameraYaw"></param>
     /// <param name="chargeTime"></param>
-    public void SubmitLocalInput(int playerId, uint moveDir, bool jump, bool attack, bool skill, float cameraYaw, float chargeTime)
+    /// <summary>
+    /// 主机玩家提交本地输入。cameraYaw/chargeTime 已由调用方转为 Fix64。
+    /// 写入 protobuf 时转为 float（protobuf 不支持 Fix64）。
+    /// </summary>
+    public void SubmitLocalInput(int playerId, uint moveDir, bool jump, bool attack, bool skill, Fix64 cameraYaw, Fix64 chargeTime)
     {
         if (!_isRunning || !_isWaitingForInput) return;
         if (!_activePlayers.Contains(playerId)) return;
@@ -271,8 +274,8 @@ public class TickSyncHandler
             Jump = jump,
             Attack = attack,
             Skill = skill,
-            CameraYaw = cameraYaw,
-            ChargeTime = chargeTime
+            CameraYaw = cameraYaw.ToFloat(),
+            ChargeTime = chargeTime.ToFloat()
         };
     }
 

@@ -1,15 +1,15 @@
 ManifestFileVersion: 0
-CRC: 1435011023
+CRC: 3822124128
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: a50adcb71f473bb0ac5d5b259c4579a5
+    Hash: be270355c60da93f1029d2c2ad2ce730
   TypeTreeHash:
     serializedVersion: 2
-    Hash: 2a7edac6dda793966f9c70ac9a697a7a
+    Hash: bd20ec2655692b78f9ebf4624cc441ce
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: a50adcb71f473bb0ac5d5b259c4579a5
+    Hash: be270355c60da93f1029d2c2ad2ce730
 HashAppended: 0
 ClassTypes:
 - Class: 1
@@ -25,9 +25,9 @@ ClassTypes:
 - Class: 114
   Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
 - Class: 114
-  Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-- Class: 114
   Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
 - Class: 114
   Script: {fileID: 11500000, guid: d199490a83bb2b844b9695cbf13b01ef, type: 3}
 - Class: 114
@@ -103,6 +103,7 @@ Assets:
 - Assets/Resources/UI/BeginSceneUI/ChangeNamePanel.prefab
 - Assets/Resources/UI/BeginSceneUI/PlayExplainPanel.prefab
 - Assets/Resources/UI/BeginSceneUI/CreateRoomPanel.prefab
+- Assets/Resources/UI/GameSceneUI/imgMask.prefab
 - Assets/Resources/UI/BeginSceneUI/SettingPanel.prefab
 - Assets/Resources/UI/TipPanel.prefab
 - Assets/Resources/UI/GameSceneUI/GamePanel.prefab

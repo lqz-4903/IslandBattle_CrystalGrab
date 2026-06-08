@@ -42,14 +42,14 @@ public class TickExecutor : MonoBehaviour
     // 逻辑帧率（每秒执行的帧数）
     private int _tickRate;
 
-    // 每帧的时间间隔（秒），等于 1f / _tickRate
-    private float _tickInterval;
+    // 每帧的时间间隔（Fix64 确定性）
+    private Fix64 _tickInterval;
 
     // 当前已执行到的帧号（单调递增）
     private int _localTick;
 
     // 帧间隔累加计时器（客户端正常模式下用于控制执行节奏）
-    private float _tickTimer;
+    private Fix64 _tickTimer;
 
     // 是否处于追赶模式（积压帧过多时快速消化）
     private bool _isCatchingUp;
@@ -76,9 +76,9 @@ public class TickExecutor : MonoBehaviour
     {
         _isHost = isHost;
         _tickRate = tickRate;
-        _tickInterval = 1f / tickRate;
+        _tickInterval = Fix64.One / Fix64.FromInt(tickRate);
         _localTick = 0;
-        _tickTimer = 0f;
+        _tickTimer = Fix64.Zero;
         _isCatchingUp = false;
         _pendingTicks.Clear();
         _isInitialized = true;
@@ -114,49 +114,46 @@ public class TickExecutor : MonoBehaviour
 
     private void Update()
     {
-        // 未初始化跳过
         if (!_isInitialized) return;
 
         if (_isHost)
         {
-            // 主机模式：队列中有帧就立即全部执行 不等待
+            // 主机模式：队列中有帧就立即全部执行，不等待
             while (_pendingTicks.Count > 0)
             {
                 if (_pendingTicks.TryDequeue(out InputTick result))
                     ExecuteSingleTick(result);
-            }               
+            }
         }
         else
         {
             // 客户端模式：按帧率节奏或追赶模式执行
             ClientTickUpdate();
         }
-
     }
 
     /// <summary>
-    /// 客户端帧驱动主循环（每帧调用一次）
-    /// 负责：正常按固定间隔执行帧 / 积压时进入追赶模式快速执行
+    /// 客户端帧驱动主循环。
+    /// Time.deltaTime 在入口处转换为 Fix64，游戏逻辑层不再直接使用 float 时间。
     /// </summary>
     private void ClientTickUpdate()
     {
-        // 队列为空 无需处理
         if (_pendingTicks.Count == 0) return;
+
+        // 将 Unity 的 deltaTime 转换为 Fix64（确定性模拟的理想做法是使用固定时间步长）
+        Fix64 dt = Fix64.FromFloat(Time.deltaTime);
 
         // ============= 追赶模式：快速执行积压帧 =============
         if (_isCatchingUp)
         {
-            // 追赶模式：每帧最多执行 MAX_CATCHUP_PER_TICK 帧，快速消化积压
             int executed = 0;
             while (_pendingTicks.Count > 0 && executed < MaxCatchUpPreTick)
             {
-                // 取出队首帧并执行
                 if (_pendingTicks.TryDequeue(out InputTick result))
                     ExecuteSingleTick(result);
                 executed++;
             }
 
-            // 条件：队列清空 + 本地帧追上目标帧 -> 退出追赶模式 恢复正常节奏
             if (_pendingTicks.Count == 0 && _localTick >= _targetTick)
             {
                 _isCatchingUp = false;
@@ -166,20 +163,16 @@ public class TickExecutor : MonoBehaviour
         // ============= 正常模式：按固定时间间隔执行帧 =============
         else
         {
-            // 正常模式：累加时间 达到一帧间隔后执行一帧
-            _tickTimer += Time.deltaTime;
+            _tickTimer += dt;
 
-            // 时间达到一帧间隔 -> 执行一帧逻辑
             if (_tickTimer >= _tickInterval)
             {
-                // 扣减一个间隔 保留余量避免累计误差
                 _tickTimer -= _tickInterval;
 
                 if (_pendingTicks.Count > 0 && _pendingTicks.TryDequeue(out InputTick result))
                     ExecuteSingleTick(result);
             }
 
-            // 积压超过3帧 说明网络延迟或处理过慢 切换到追赶模式
             if (_pendingTicks.Count > 3)
             {
                 _isCatchingUp = true;

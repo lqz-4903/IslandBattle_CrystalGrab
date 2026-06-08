@@ -101,12 +101,15 @@ public readonly struct Fix64 : IEquatable<Fix64>, IComparable<Fix64>
     public static Fix64 operator -(Fix64 a) => new Fix64(-a.Raw);
 
     /// <summary>
-    /// 乘法：需要避免溢出，先取高32位再乘
+    /// 乘法：拆分为高低 32 位分别计算再合并，防止 64 位溢出。
+    /// 公式： (aHi*ONE + aLo) * (bHi*ONE + bLo) / ONE
+    ///      = aHi*bHi*ONE + aHi*bLo + aLo*bHi + aLo*bLo/ONE
+    /// 约束：aHi*bHi 必须 < 2^31，即两操作数的整数部分乘积 < 2^31。
+    ///       这限制了 Fix64 的整数部分不能同时超过约 46340。
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Fix64 operator *(Fix64 a, Fix64 b)
     {
-        // 分成高低位运算防溢出
         long al = a.Raw;
         long bl = b.Raw;
 
@@ -120,17 +123,30 @@ public readonly struct Fix64 : IEquatable<Fix64>, IComparable<Fix64>
         long hiLo = aHi * bLo;
         long hiHi = aHi * bHi << FRACTIONAL_BITS;
 
+        // 溢出检测：如果 aHi 和 bHi 都非零，hiHi 可能溢出
+        // 对于游戏逻辑 (坐标/速度)，整数部分通常远小于 46340，不会溢出
         return new Fix64(loLo + loHi + hiLo + hiHi);
     }
 
     /// <summary>
-    /// 除法
+    /// 除法。
+    /// 传统做法 (a.Raw &lt;&lt; 32) / b.Raw 在较大值时会溢出 long。
+    /// 改用恒等式分解：a / b = (a.Raw ÷ b.Raw) * ONE + (a.Raw % b.Raw) * ONE / b.Raw
+    /// 其中 ÷ 是整数除法，% 是取余，各自左移前都在安全范围内。
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Fix64 operator /(Fix64 a, Fix64 b)
     {
         if (b.Raw == 0) throw new DivideByZeroException("Fix64 divide by zero");
-        return new Fix64((a.Raw << FRACTIONAL_BITS) / b.Raw);
+
+        long intPart = a.Raw / b.Raw;                        // 整数商（以 1.0 为单位）
+        long remainder = a.Raw % b.Raw;                      // 余数
+
+        // intPart * ONE + (remainder * ONE) / b.Raw
+        long hi = intPart << FRACTIONAL_BITS;
+        long lo = (remainder << FRACTIONAL_BITS) / b.Raw;
+
+        return new Fix64(hi + lo);
     }
 
     public static Fix64 operator %(Fix64 a, Fix64 b)
@@ -169,25 +185,25 @@ public readonly struct Fix64 : IEquatable<Fix64>, IComparable<Fix64>
     public static Fix64 Min(Fix64 a, Fix64 b) => a < b ? a : b;
     public static Fix64 Max(Fix64 a, Fix64 b) => a > b ? a : b;
 
-    // ========== Sqrt（牛顿迭代） ==========
+    // ========== Sqrt（二进制逐位开方 + Newton 精修） ==========
 
     public static Fix64 Sqrt(Fix64 a)
     {
         if (a.Raw < 0) throw new ArithmeticException("Fix64 Sqrt of negative");
         if (a.Raw == 0) return Zero;
 
-        // 初始猜测：取一半位数
         long x = a.Raw;
         long result = 0;
         long bit = 1L << (FRACTIONAL_BITS + 30);
 
-        // 二进制逐位开方（整数+小数统一处理）
+        // 二进制逐位开方（整数+小数统一处理，完全确定性，不依赖浮点）
         while (bit > x) bit >>= 2;
         while (bit != 0)
         {
-            if (x >= result + bit)
+            long sum = result + bit;
+            if (x >= sum)
             {
-                x -= result + bit;
+                x -= sum;
                 result = (result >> 1) + bit;
             }
             else
@@ -197,9 +213,13 @@ public readonly struct Fix64 : IEquatable<Fix64>, IComparable<Fix64>
             bit >>= 2;
         }
 
-        // 牛顿迭代精修2轮
-        result = (result + (a.Raw << FRACTIONAL_BITS) / result) >> 1;
-        result = (result + (a.Raw << FRACTIONAL_BITS) / result) >> 1;
+        // Newton 精修 1 轮（安全分解，避免 (a.Raw << 32) 溢出）:
+        // r1 = (r0 + a/r0) / 2
+        // a/r0 用分解：商 = a.Raw / result, 余 = a.Raw % result
+        long quot = a.Raw / result;
+        long rem = a.Raw % result;
+        long div = (quot << FRACTIONAL_BITS) + ((rem << FRACTIONAL_BITS) / result);
+        result = (result + div) >> 1;
 
         return new Fix64(result);
     }
@@ -245,12 +265,23 @@ public readonly struct Fix64 : IEquatable<Fix64>, IComparable<Fix64>
 
     public static Fix64 Cos(Fix64 radians) => Sin(radians + HalfPi);
 
+    //Atan2 系数（预计算 raw 值，避免 FromDouble 的浮点舍入误差）
+    private const long AtanCoef0Raw = 4294042386L;   // 0.9998660 * ONE
+    private const long AtanCoef1Raw = 1289025051L;   // 0.3001455 * ONE (取负)
+    private const long AtanCoef2Raw = 656571189L;     // 0.1528793 * ONE
+    private const long AtanCoef3Raw = 273536403L;     // 0.0636918 * ONE (取负)
+
+    private static readonly Fix64 AtanCoef0 = new Fix64(AtanCoef0Raw);
+    private static readonly Fix64 AtanCoef1 = new Fix64(AtanCoef1Raw);
+    private static readonly Fix64 AtanCoef2 = new Fix64(AtanCoef2Raw);
+    private static readonly Fix64 AtanCoef3 = new Fix64(AtanCoef3Raw);
+
     /// <summary>
-    /// Atan2(y, x) — 用近似公式，精度够游戏用
+    /// Atan2(y, x) — 用 MinMax 归一化 + 4 阶多项式近似，精度 ±0.001 弧度。
+    /// 系数使用预计算的 raw 值，完全确定性，不依赖浮点。
     /// </summary>
     public static Fix64 Atan2(Fix64 y, Fix64 x)
     {
-        // 特殊情况
         if (x.Raw == 0 && y.Raw == 0) return Zero;
 
         Fix64 absX = Abs(x);
@@ -261,13 +292,8 @@ public readonly struct Fix64 : IEquatable<Fix64>, IComparable<Fix64>
         Fix64 a = minVal / maxVal;
         Fix64 s = a * a;
 
-        // atan近似公式: r ≈ a * (0.9998660 - 0.3001455*s + 0.1528793*s² - 0.0636918*s³)
-        Fix64 r = a * (
-            FromDouble(0.9998660)
-            - FromDouble(0.3001455) * s
-            + FromDouble(0.1528793) * s * s
-            - FromDouble(0.0636918) * s * s * s
-        );
+        // atan 近似: r ≈ a * (C0 - C1*s + C2*s² - C3*s³)
+        Fix64 r = a * (AtanCoef0 - AtanCoef1 * s + AtanCoef2 * s * s - AtanCoef3 * s * s * s);
 
         if (absY > absX) r = HalfPi - r;
         if (x.Raw < 0) r = Pi - r;

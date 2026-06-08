@@ -194,10 +194,10 @@ end
 
 -- 立即显示（无动画）
 function BasePanel:ShowImmediate(name)
-    if self.panelObj and not self.panelObj.activeSelf then
-        self:HideImmediate()
-    end
+    -- 停止正在播放的淡入淡出动画（如果有）
+    self:StopFade()
 
+    -- 首次使用或面板被销毁后重新加载
     if IsNull(self.panelObj) then
         self:Init(name)
     end

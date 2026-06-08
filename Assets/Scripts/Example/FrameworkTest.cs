@@ -14,7 +14,7 @@ public class FrameworkTest : MonoBehaviour
 
     void Start()
     {
-        _host = HostServer.Intansce;
+        _host = HostServer.Instance;
         if (_host == null)
         {
             Debug.LogError("场景中没有 HostServer！");
@@ -48,7 +48,7 @@ public class FrameworkTest : MonoBehaviour
         if (!_gameStarted && _host.CurrentRoom != null && _host.CurrentRoom.ConvToPlayer.Count >= 2)
         {
             var startMsg = new GameStart();
-            EventCenter.Dispatch(16, RoomData.HOST_CONV, startMsg);
+            EventCenter.Dispatch(16, RoomData.HostConv, startMsg);
             Debug.Log("[测试] 派发GameStart");
         }
 

@@ -20,18 +20,22 @@ message NetMessage{
 		StartGame	  	start_game				= 15;
 		GameStart	  	game_start				= 16;
 		PlayerInfo		player_info				= 17;
+		RequestPlayerList request_player_list = 18;
+		ReturnToRoom	return_to_room			= 19;
 
 		// 帧同步
 		InputTick	    input_tick				= 20;
 		PlayerInput   player_input			= 21;
 
 		// 游戏事件
-		CrystalSpawn  crystal_spawn			= 30;
-		CrystalPickup crystal_pickup		= 31;
-		PlayerHit 	  player_hit				= 32;
-		PlayerFall	  player_fall				= 33;
-		GameEnd		  	game_end					= 34;
-		PlayerRespawn  player_respawn  = 35;
+		CrystalSpawn  	crystal_spawn			= 30;
+		CrystalPickup 	crystal_pickup		= 31;
+		PlayerHit 	  	player_hit				= 32;
+		PlayerFall	  	player_fall				= 33;
+		GameEnd		  		game_end					= 34;
+		PlayerRespawn  	player_respawn  	= 35;
+		GameTimerUpdate game_timer_update	= 36;
+		PlayerOffline   player_offline    = 37;
 
 		// 重连
 		Reconnect 	  reconnect 				= 40;
@@ -44,7 +48,7 @@ message NetMessage{
 // ============== 底层系统消息 ============
 
 // 1
-message HeartBeat {	
+message HeartBeat {
   int64 time = 1;
 }
 
@@ -95,6 +99,16 @@ message PlayerList{
 	repeated PlayerInfo players = 1;
 }
 
+// 18 客户端请求刷新玩家列表
+message RequestPlayerList{
+	// 空消息，就是一个信号
+}
+
+// 19 客户端通知服务器已从游戏返回房间
+message ReturnToRoom{
+	int32 player_id = 1;
+}
+
 // 15 房主开始游戏
 message StartGame{
 	// 房主发的 无字段 就是一个信号
@@ -142,7 +156,7 @@ message CrystalSpawn{
 	int32 crystal_id = 1;
 	float pos_x		 	 = 2;
 	float pos_y		   = 3;
-	float pos_z 	   = 4; 
+	float pos_z 	   = 4;
 }
 
 // 31
@@ -177,6 +191,18 @@ message PlayerRespawn {
 message GameEnd{
 	repeated int32 scores 	 = 1;	// index = player_id
 	int32 		   	 winner_id = 2;
+	string				 winner_name = 3;
+}
+
+// 36 游戏倒计时同步（房主定期广播）
+message GameTimerUpdate{
+	float remaining_time = 1;	// 剩余时间（秒）
+}
+
+// 37 服务器通知：某玩家心跳超时离线
+message PlayerOffline{
+	int32  player_id   = 1;
+	string player_name = 2;
 }
 
 // ============== 短线重连 ============

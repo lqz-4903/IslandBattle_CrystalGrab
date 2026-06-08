@@ -96,6 +96,7 @@ end
 function PlayerData.SetMusicOn(on)
     local data = PlayerData.Load()
     data.musicOn = on
+    PlayerData.Save()
 end
 
 function PlayerData.GetMusicVolume()
@@ -106,6 +107,7 @@ end
 function PlayerData.SetMusicVolume(vol)
     local data = PlayerData.Load()
     data.musicVolume = vol
+    PlayerData.Save()
 end
 
 -- ========== 音效设置 ==========
@@ -118,6 +120,7 @@ end
 function PlayerData.SetSoundOn(on)
     local data = PlayerData.Load()
     data.soundOn = on
+    PlayerData.Save()
 end
 
 function PlayerData.GetSoundVolume()
@@ -128,6 +131,7 @@ end
 function PlayerData.SetSoundVolume(vol)
     local data = PlayerData.Load()
     data.soundVolume = vol
+    PlayerData.Save()
 end
 
 return PlayerData

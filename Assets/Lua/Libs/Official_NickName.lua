@@ -2,6 +2,7 @@
 GameObject = CS.UnityEngine.GameObject
 PrimitiveType = CS.UnityEngine.PrimitiveType
 Rigidbody = CS.UnityEngine.Rigidbody
+Vector2 = CS.UnityEngine.Vector2
 Vector3 = CS.UnityEngine.Vector3
 Transform = CS.UnityEngine.Transform
 Resources = CS.UnityEngine.Resources

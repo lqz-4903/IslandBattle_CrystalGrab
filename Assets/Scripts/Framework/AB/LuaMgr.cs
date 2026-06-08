@@ -127,10 +127,7 @@ public class LuaMgr
     public void Tick()
     {
         if (luaEnv == null)
-        {
-            Debug.Log("解析器未初始化");
             return;
-        }
         luaEnv.Tick();
     }
 
