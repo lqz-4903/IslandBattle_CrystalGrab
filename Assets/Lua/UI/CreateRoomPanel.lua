@@ -106,6 +106,10 @@ function CreateRoomPanel:Show(isHost, roomId, joinHostName)
             txtRoomHost.text = "房主：" .. hostName
         end
 
+        -- ★ 保存本地玩家信息（供 Main.lua 游戏启动时使用）
+        _G.localPlayerId = 1   -- 房主始终是 playerId=1
+        _G.localPlayerName = hostName
+
         -- ★ 如果服务器已在运行（游戏结束后回到房间），清空本地 UI 并从服务器刷新完整玩家列表
         --    如果服务器未运行（首次创建房间），只添加房主自己
         if CS.HostServer.Instance.IsRunning and CS.HostServer.Instance.CurrentRoom ~= nil then
@@ -177,27 +181,35 @@ end
 function CreateRoomPanel:_onPlayerListReceived(playerList)
     if playerList.Players == nil then return end
 
-    -- 1. 收集服务端玩家：去除 \x01 后缀得到干净名字，建立映射
-    local serverNames = {}       -- 干净名字 → true（用于匹配）
-    local serverNameToStatus = {} -- 干净名字 → "已在房间" / "还在游戏中"
+    -- ★ 保存最新 PlayerList 到全局变量（供 Main.lua InitGame 生成玩家用）
+    _G.lastPlayerList = playerList
+
+    -- 1. 按服务端顺序收集玩家（protobuf 列表顺序 = 加入顺序，房主在第一位）
+    local serverOrdered = {}       -- 数组：{cleanName1, cleanName2, ...} 保持服务端顺序
+    local serverNameToStatus = {}  -- 干净名字 → "已在房间" / "还在游戏中"
     for i = 0, playerList.Players.Count - 1 do
         local p = playerList.Players[i]
         local rawName = p.PlayerName
         local cleanName = rawName
         local isInGame = false
-        -- ★ 解码：名字末尾 \x01 表示"还在游戏中"
         if string.sub(rawName, -1) == "\x01" then
             cleanName = string.sub(rawName, 1, -2)
             isInGame = true
         end
-        serverNames[cleanName] = true
+        serverOrdered[i + 1] = cleanName
         serverNameToStatus[cleanName] = isInGame and "还在游戏中" or "已在房间"
     end
 
-    -- 2. 收集当前 UI 中已有的玩家名，并移除不在服务端列表中的条目
+    -- 构建快速查找表
+    local serverLookup = {}
+    for _, name in ipairs(serverOrdered) do
+        serverLookup[name] = true
+    end
+
+    -- 2. 移除 UI 中不在服务端列表的玩家条目
+    local imgPeoples = self:GetControl("imgPeoples", "Image")
     local existingNames = {}
     local toRemove = {}
-    local imgPeoples = self:GetControl("imgPeoples", "Image")
     if imgPeoples ~= nil then
         local transform = imgPeoples.transform
         for i = 0, transform.childCount - 1 do
@@ -205,14 +217,13 @@ function CreateRoomPanel:_onPlayerListReceived(playerList)
             if string.find(child.name, "txtPlayer") ~= nil then
                 local txt = child:GetComponent(typeof(CS.UnityEngine.UI.Text))
                 if txt ~= nil then
-                    -- 解析玩家名: "玩家\tName\t..."
                     local parts = txt.text:split("\t")
                     if #parts >= 2 then
                         local name = parts[2]
-                        if serverNames[name] then
-                            existingNames[name] = true  -- 保留
+                        if serverLookup[name] then
+                            existingNames[name] = child  -- 保留，记录引用
                         else
-                            table.insert(toRemove, child)  -- 已离开，移除
+                            table.insert(toRemove, child)
                         end
                     end
                 end
@@ -220,25 +231,26 @@ function CreateRoomPanel:_onPlayerListReceived(playerList)
         end
     end
     for _, child in ipairs(toRemove) do
-        -- ★ 先 SetParent(nil) 立即从层级移除，否则 Unity Destroy 延迟销毁会导致
-        --    RefreshStartBtn 仍计入已删除的 txtPlayer，按钮状态无法及时更新
         child:SetParent(nil)
         GameObject.Destroy(child.gameObject)
     end
 
-    -- 3. 添加服务端有但 UI 中没有的玩家（使用干净名字）
+    -- 3. 按服务端顺序添加 UI 中没有的玩家
     local added = false
-    for cleanName, _ in pairs(serverNames) do
+    for _, cleanName in ipairs(serverOrdered) do
         if not existingNames[cleanName] then
             self:AddPlayer(cleanName)
             added = true
         end
     end
 
-    -- 4. ★ 更新所有现有玩家的状态文字（根据编码的 \x01 判断）
+    -- 4. ★ 按服务端顺序重排所有 txtPlayer 的层级（sibling index）
+    self:_ReorderPlayersToServerOrder(serverOrdered)
+
+    -- 5. 更新所有现有玩家的状态文字
     self:_refreshAllPlayerStatus(serverNameToStatus)
 
-    -- 5. 如果有增删，刷新布局和按钮状态
+    -- 6. 如果有增删，刷新布局和按钮状态
     if #toRemove > 0 or added then
         self:LayoutPlayers()
         self:RefreshStartBtn()
@@ -313,6 +325,41 @@ function CreateRoomPanel:_refreshAllPlayerStatus(serverNameToStatus)
                     end
                 end
             end
+        end
+    end
+end
+
+-- 按服务端顺序重排所有 txtPlayer 在 imgPeoples 下的层级
+-- serverOrdered: 服务端返回的有序名字数组 {name1, name2, ...}
+function CreateRoomPanel:_ReorderPlayersToServerOrder(serverOrdered)
+    local imgPeoples = self:GetControl("imgPeoples", "Image")
+    if imgPeoples == nil then return end
+
+    local transform = imgPeoples.transform
+
+    -- 收集所有 txtPlayer 子对象，建立 name → child 映射
+    local nameToChild = {}
+    for i = 0, transform.childCount - 1 do
+        local child = transform:GetChild(i)
+        if string.find(child.name, "txtPlayer") ~= nil then
+            local txt = child:GetComponent(typeof(CS.UnityEngine.UI.Text))
+            if txt ~= nil then
+                local parts = txt.text:split("\t")
+                if #parts >= 2 then
+                    nameToChild[parts[2]] = child
+                end
+            end
+        end
+    end
+
+    -- 按服务端顺序逐次 setAsLastSibling，最终顺序 = serverOrdered
+    -- 先把所有 txtPlayer 移到末尾（按 serverOrdered 顺序），非 txtPlayer 保持在前面
+    -- 技巧：按 serverOrdered 反序 setAsFirstSibling
+    for i = #serverOrdered, 1, -1 do
+        local name = serverOrdered[i]
+        local child = nameToChild[name]
+        if child ~= nil then
+            child:SetAsFirstSibling()
         end
     end
 end
@@ -514,6 +561,16 @@ end
 -- 收到 GameStart（服务器已开始游戏，客户端切换到 GameScene）
 function CreateRoomPanel:_onGameStartReceived(gameStart)
     print("【CreateRoomPanel】服务器开始游戏，客户端切换到 GameScene seed=" .. gameStart.RandomSeed)
+
+    -- ★ 保存 GameStart 数据供 Main.lua InitGame 使用
+    _G.pendingGameStart = {
+        randomSeed   = gameStart.RandomSeed,
+        playerCount  = gameStart.PlayerCount,
+        gameDuration = gameStart.GameDuration,
+        targetScore  = gameStart.TargetScore,
+        tickRate     = gameStart.TickRate,
+    }
+
     -- 销毁所有UI，切换到GameScene（与房主 btnStartGame 行为一致）
     self:Hide()
     BeginPanel:Hide()
@@ -585,8 +642,30 @@ function CreateRoomPanel:BindEvents()
                 -- 使用确定性随机生成种子，保证跨平台一致
                 local rng = DeterministicRandom.new(os.time())
                 local seed = rng:nextRange(1, 2147483647)
+
+                -- 统计当前房间玩家数
+                local count = 0
+                local imgPeoples = self:GetControl("imgPeoples", "Image")
+                if imgPeoples ~= nil then
+                    local t = imgPeoples.transform
+                    for i = 0, t.childCount - 1 do
+                        if string.find(t:GetChild(i).name, "txtPlayer") ~= nil then
+                            count = count + 1
+                        end
+                    end
+                end
+
+                -- ★ 保存 GameStart 数据供 Main.lua InitGame 使用（房主路径）
+                _G.pendingGameStart = {
+                    randomSeed   = seed,
+                    playerCount  = count,
+                    gameDuration = 120,
+                    targetScore  = 10,
+                    tickRate     = 15,
+                }
+
                 -- 从已有房间启动游戏（KCP 服务器已在 Show 时启动，不重启）
-                CS.HostServer.Instance:StartGame(seed, 10)
+                CS.HostServer.Instance:StartGame(seed, 120)
                 -- 销毁所有UI，切换到GameScene
                 self:Hide()
                 BeginPanel:Hide()

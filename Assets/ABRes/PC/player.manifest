@@ -1,0 +1,50 @@
+ManifestFileVersion: 0
+CRC: 2785147630
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 2d2d598e8b9855020f958905589af0e9
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 889ed0ad180034cf97351720172cda38
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 2d2d598e8b9855020f958905589af0e9
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 20
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 74
+  Script: {instanceID: 0}
+- Class: 81
+  Script: {instanceID: 0}
+- Class: 90
+  Script: {instanceID: 0}
+- Class: 91
+  Script: {instanceID: 0}
+- Class: 95
+  Script: {instanceID: 0}
+- Class: 137
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/Resources/Role/ArrowDefault.prefab
+- Assets/Resources/Role/ArrowHard.prefab
+- Assets/Resources/Role/HeroDefault.prefab
+Dependencies: []

@@ -216,8 +216,8 @@ public class TickSyncHandler
                     Jump = false,
                     Attack = false,
                     Skill = false,
-                    CameraYaw = 0f,
-                    ChargeTime = 0f
+                    CameraYaw = 0L,
+                    ChargeTime = 0L
                 });
             }
         }
@@ -259,7 +259,7 @@ public class TickSyncHandler
     /// <param name="chargeTime"></param>
     /// <summary>
     /// 主机玩家提交本地输入。cameraYaw/chargeTime 已由调用方转为 Fix64。
-    /// 写入 protobuf 时转为 float（protobuf 不支持 Fix64）。
+    /// ★ Proto 改为 sfixed64 后直接传 Fix64.Raw（long），不再丢失精度。
     /// </summary>
     public void SubmitLocalInput(int playerId, uint moveDir, bool jump, bool attack, bool skill, Fix64 cameraYaw, Fix64 chargeTime)
     {
@@ -274,8 +274,8 @@ public class TickSyncHandler
             Jump = jump,
             Attack = attack,
             Skill = skill,
-            CameraYaw = cameraYaw.ToFloat(),
-            ChargeTime = chargeTime.ToFloat()
+            CameraYaw = cameraYaw.Raw,
+            ChargeTime = chargeTime.Raw
         };
     }
 

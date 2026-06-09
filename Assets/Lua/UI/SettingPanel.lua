@@ -74,6 +74,11 @@ function SettingPanel:LoadSettings()
     if sldSound ~= nil then
         sldSound.value = PlayerData.GetSoundVolume()
     end
+
+    local sldDPI = self:GetControl("sldDPI", "Slider")
+    if sldDPI ~= nil then
+        sldDPI.value = PlayerData.GetMouseDPI()
+    end
 end
 
 -- 从控件保存设置到JSON
@@ -96,6 +101,11 @@ function SettingPanel:SaveSettings()
     local sldSound = self:GetControl("sldSound", "Slider")
     if sldSound ~= nil then
         PlayerData.SetSoundVolume(sldSound.value)
+    end
+
+    local sldDPI = self:GetControl("sldDPI", "Slider")
+    if sldDPI ~= nil then
+        PlayerData.SetMouseDPI(sldDPI.value)
     end
 
     PlayerData.Save()

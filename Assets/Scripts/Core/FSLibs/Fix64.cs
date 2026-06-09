@@ -33,7 +33,7 @@ public readonly struct Fix64 : IEquatable<Fix64>, IComparable<Fix64>
 
     // ========== 构造 ==========
 
-    Fix64(long raw) { Raw = raw; }
+    public Fix64(long raw) { Raw = raw; }
 
     /// <summary>从int构造</summary>
     public static Fix64 FromInt(int value) => new Fix64((long)value << FRACTIONAL_BITS);

@@ -257,7 +257,9 @@ public class RoomHandler
         _host.OnStartGame(gameStart.RandomSeed, gameStart.GameDuration);
 
         // 2.房主本地也要收到 GameStart（不走网络，直接派发）
+        //    同时派发到两个字典，让 LuaEventBridge（_eventIntDic）和 HostServer（_eventIntConvDic）都能收到
         EventCenter.Dispatch(16, RoomData.HostConv, gameStart);
+        EventCenter.Dispatch(16, gameStart);
     }
 
     #endregion

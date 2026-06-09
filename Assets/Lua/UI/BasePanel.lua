@@ -170,6 +170,12 @@ end
 
 -- 淡入淡出的每帧回调（由全局Update驱动）
 function BasePanel:OnFadeUpdate(dt)
+    -- 面板已销毁（切场景等），停止回调
+    if not self.canvasGroup then
+        UnregisterUpdate(self.fadeUpdateId)
+        self.fadeUpdateId = nil
+        return
+    end
     self.fadeElapsed = self.fadeElapsed + dt
     local t = self.fadeElapsed / self.fadeDuration
     if t >= 1 then

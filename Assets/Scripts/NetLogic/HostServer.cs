@@ -658,16 +658,15 @@ public class HostServer : MonoBehaviour
 
     /// <summary>
     /// 本机玩家提交本地输入（由 PlayerController 调用）。
-    /// cameraYaw/chargeTime 为 float 以兼容 XLua，内部转为 Fix64 保证确定性。
+    /// cameraYawRaw/chargeTimeRaw 为 Fix64.Raw（long），不再经过 float 转换丢失精度。
     /// </summary>
-    public void SubmitHostInput(uint moveDir, bool jump, bool attack, bool skill, float cameraYaw, float chargeTime)
+    public void SubmitHostInput(uint moveDir, bool jump, bool attack, bool skill, long cameraYawRaw, long chargeTimeRaw)
     {
         if (!_isRunning || !_isGameStarted || CurrentRoom == null) return;
 
         int hostPlayerId = CurrentRoom.HostPlayerId;
-        // float → Fix64 转换点：外部输入在此处转为确定性类型
         _tickSyncHandler.SubmitLocalInput(hostPlayerId, moveDir, jump, attack, skill,
-            Fix64.FromFloat(cameraYaw), Fix64.FromFloat(chargeTime));
+            new Fix64(cameraYawRaw), new Fix64(chargeTimeRaw));
     }
     #endregion
 

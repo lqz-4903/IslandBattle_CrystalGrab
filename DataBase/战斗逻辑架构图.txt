@@ -1,0 +1,27 @@
+┌─────────────────────────────────────────────────────────┐
+│                    每帧驱动（Unity Update）                │
+│                                                         │
+│  C# TickExecutor           Lua 侧                        │
+│  ┌──────────────┐         ┌──────────────────────┐      │
+│  │ApplyInput() │───>static Action──>│ PlayerManager      │      │
+│  │              │         │   .ApplyFrameInput() │      │
+│  │OnTickExecuted│───>static Action──>│ PlayerManager      │      │
+│  │              │         │   .OnFrameEnd()      │      │
+│  └──────────────┘         └──────┬───────────────┘      │
+│                                  │                      │
+│  C# EventCenter                  │ 管理 N 个             │
+│  ┌──────────────┐         ┌──────┴───────────────┐      │
+│  │CrystalSpawn  │         │   PlayerEntity x N    │      │
+│  │PlayerHit     │──>LuaEventBridge──>NetworkEventMgr│      │
+│  │GameEnd  ...  │         └──────────────────────┘      │
+│  └──────────────┘                                        │
+│                                                         │
+│  本地玩家专属:                                            │
+│  ┌──────────────┐    ┌─────────────────┐                │
+│  │ InputHandler │───>│ PlayerController │                │
+│  │ (键盘/鼠标)   │    │ (移动/摄像机/射击) │                │
+│  └──────────────┘    └────────┬────────┘                │
+│                               │ SubmitHostInput / Send   │
+│                               ▼                          │
+│                          C# HostServer / NetMgr          │
+└─────────────────────────────────────────────────────────┘

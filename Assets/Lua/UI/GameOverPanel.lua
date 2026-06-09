@@ -10,12 +10,12 @@ function GameOverPanel:CreateMask()
     if not IsNull(self.maskObj) then
         return  -- 遮罩已存在，避免重复创建
     end
-    local maskPrefab = ABMgr:LoadRes("ui", "imgMask", typeof(GameObject))
-    if IsNull(maskPrefab) then
+    -- 注意：ABMgr:LoadRes 对 GameObject 类型已自动 Instantiate，直接使用返回值即可
+    self.maskObj = ABMgr:LoadRes("ui", "imgMask", typeof(GameObject))
+    if IsNull(self.maskObj) then
         print("[GameOverPanel] 错误：找不到 imgMask 预制体")
         return
     end
-    self.maskObj = GameObject.Instantiate(maskPrefab)
     local canvasGo = GameObject.Find("Canvas")
     if canvasGo ~= nil then
         self.maskObj.transform:SetParent(canvasGo.transform, false)

@@ -10,7 +10,8 @@ PlayerData._defaults = {
     musicOn = true,
     soundOn = true,
     musicVolume = 1,
-    soundVolume = 1
+    soundVolume = 1,
+    mouseDPI = 50    -- 鼠标灵敏度，范围 1~100，默认 50
 }
 
 -- 获取文件路径（延迟初始化，确保CS可用）
@@ -131,6 +132,19 @@ end
 function PlayerData.SetSoundVolume(vol)
     local data = PlayerData.Load()
     data.soundVolume = vol
+    PlayerData.Save()
+end
+
+-- ========== 鼠标灵敏度 ==========
+
+function PlayerData.GetMouseDPI()
+    local data = PlayerData.Load()
+    return data.mouseDPI or 50
+end
+
+function PlayerData.SetMouseDPI(dpi)
+    local data = PlayerData.Load()
+    data.mouseDPI = dpi
     PlayerData.Save()
 end
 

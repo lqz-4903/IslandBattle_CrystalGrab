@@ -256,6 +256,10 @@ function JoinRoomPanel:OnJoinSuccess(ack)
     -- 保存房间号到 CreateRoomPanel（用于本地路径匹配和后续使用）
     CreateRoomPanel.roomID = roomId
 
+    -- ★ 保存本地玩家信息（供 Main.lua 游戏启动时使用）
+    _G.localPlayerId = ack.PlayerId
+    _G.localPlayerName = self._joinPlayerName or "Player"
+
     self:CleanupJoin()
 
     self:Hide()

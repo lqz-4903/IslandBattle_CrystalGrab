@@ -65,18 +65,18 @@ namespace GameProto {
             "bhgDIAEoAhIUCgx0YXJnZXRfc2NvcmUYBCABKAUSEQoJdGlja19yYXRlGAUg",
             "ASgFIpYBCgtQbGF5ZXJJbnB1dBIRCglwbGF5ZXJfaWQYASABKAUSDAoEdGlj",
             "axgCIAEoBRIQCghtb3ZlX2RpchgDIAEoDRIMCgRqdW1wGAggASgIEg4KBmF0",
-            "dGFjaxgEIAEoCBINCgVza2lsbBgFIAEoCBISCgpjYW1lcmFfeWF3GAYgASgC",
-            "EhMKC2NoYXJnZV90aW1lGAcgASgCIjwKCUlucHV0VGljaxIMCgR0aWNrGAEg",
+            "dGFjaxgEIAEoCBINCgVza2lsbBgFIAEoCBISCgpjYW1lcmFfeWF3GAYgASgQ",
+            "EhMKC2NoYXJnZV90aW1lGAcgASgQIjwKCUlucHV0VGljaxIMCgR0aWNrGAEg",
             "ASgFEiEKBmlucHV0cxgCIAMoCzIRLkdhbWUuUGxheWVySW5wdXQiTwoMQ3J5",
-            "c3RhbFNwYXduEhIKCmNyeXN0YWxfaWQYASABKAUSDQoFcG9zX3gYAiABKAIS",
-            "DQoFcG9zX3kYAyABKAISDQoFcG9zX3oYBCABKAIiSQoNQ3J5c3RhbFBpY2t1",
+            "c3RhbFNwYXduEhIKCmNyeXN0YWxfaWQYASABKAUSDQoFcG9zX3gYAiABKBAS",
+            "DQoFcG9zX3kYAyABKBASDQoFcG9zX3oYBCABKBAiSQoNQ3J5c3RhbFBpY2t1",
             "cBISCgpjcnlzdGFsX2lkGAEgASgFEhEKCXBsYXllcl9pZBgCIAEoBRIRCglu",
             "ZXdfc2NvcmUYAyABKAUiSgoJUGxheWVySGl0EhMKC2F0dGFja2VyX2lkGAEg",
             "ASgFEhEKCXZpY3RpbV9pZBgCIAEoBRIVCg1kcm9wcGVkX2NvdW50GAMgASgF",
             "IjYKClBsYXllckZhbGwSEQoJcGxheWVyX2lkGAEgASgFEhUKDWRyb3BwZWRf",
             "Y291bnQYAiABKAUiTwoNUGxheWVyUmVzcGF3bhIRCglwbGF5ZXJfaWQYASAB",
-            "KAUSDQoFcG9zX3gYAiABKAISDQoFcG9zX3kYAyABKAISDQoFcG9zX3oYBCAB",
-            "KAIiQQoHR2FtZUVuZBIOCgZzY29yZXMYASADKAUSEQoJd2lubmVyX2lkGAIg",
+            "KAUSDQoFcG9zX3gYAiABKBASDQoFcG9zX3kYAyABKBASDQoFcG9zX3oYBCAB",
+            "KBAiQQoHR2FtZUVuZBIOCgZzY29yZXMYASADKAUSEQoJd2lubmVyX2lkGAIg",
             "ASgFEhMKC3dpbm5lcl9uYW1lGAMgASgJIikKD0dhbWVUaW1lclVwZGF0ZRIW",
             "Cg5yZW1haW5pbmdfdGltZRgBIAEoAiI3Cg1QbGF5ZXJPZmZsaW5lEhEKCXBs",
             "YXllcl9pZBgBIAEoBRITCgtwbGF5ZXJfbmFtZRgCIAEoCSIxCglSZWNvbm5l",
@@ -4631,13 +4631,13 @@ namespace GameProto {
 
     /// <summary>Field number for the "camera_yaw" field.</summary>
     public const int CameraYawFieldNumber = 6;
-    private float cameraYaw_;
+    private long cameraYaw_;
     /// <summary>
     /// 摄像机水平角度（度） 决定WASD的前方
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public float CameraYaw {
+    public long CameraYaw {
       get { return cameraYaw_; }
       set {
         cameraYaw_ = value;
@@ -4646,13 +4646,13 @@ namespace GameProto {
 
     /// <summary>Field number for the "charge_time" field.</summary>
     public const int ChargeTimeFieldNumber = 7;
-    private float chargeTime_;
+    private long chargeTime_;
     /// <summary>
     /// 右键蓄力时长（秒） skill = true 时有效
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public float ChargeTime {
+    public long ChargeTime {
       get { return chargeTime_; }
       set {
         chargeTime_ = value;
@@ -4680,8 +4680,8 @@ namespace GameProto {
       if (Jump != other.Jump) return false;
       if (Attack != other.Attack) return false;
       if (Skill != other.Skill) return false;
-      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(CameraYaw, other.CameraYaw)) return false;
-      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(ChargeTime, other.ChargeTime)) return false;
+      if (CameraYaw != other.CameraYaw) return false;
+      if (ChargeTime != other.ChargeTime) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -4695,8 +4695,8 @@ namespace GameProto {
       if (Jump != false) hash ^= Jump.GetHashCode();
       if (Attack != false) hash ^= Attack.GetHashCode();
       if (Skill != false) hash ^= Skill.GetHashCode();
-      if (CameraYaw != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(CameraYaw);
-      if (ChargeTime != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(ChargeTime);
+      if (CameraYaw != 0L) hash ^= CameraYaw.GetHashCode();
+      if (ChargeTime != 0L) hash ^= ChargeTime.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -4735,13 +4735,13 @@ namespace GameProto {
         output.WriteRawTag(40);
         output.WriteBool(Skill);
       }
-      if (CameraYaw != 0F) {
-        output.WriteRawTag(53);
-        output.WriteFloat(CameraYaw);
+      if (CameraYaw != 0L) {
+        output.WriteRawTag(49);
+        output.WriteSFixed64(CameraYaw);
       }
-      if (ChargeTime != 0F) {
-        output.WriteRawTag(61);
-        output.WriteFloat(ChargeTime);
+      if (ChargeTime != 0L) {
+        output.WriteRawTag(57);
+        output.WriteSFixed64(ChargeTime);
       }
       if (Jump != false) {
         output.WriteRawTag(64);
@@ -4777,13 +4777,13 @@ namespace GameProto {
         output.WriteRawTag(40);
         output.WriteBool(Skill);
       }
-      if (CameraYaw != 0F) {
-        output.WriteRawTag(53);
-        output.WriteFloat(CameraYaw);
+      if (CameraYaw != 0L) {
+        output.WriteRawTag(49);
+        output.WriteSFixed64(CameraYaw);
       }
-      if (ChargeTime != 0F) {
-        output.WriteRawTag(61);
-        output.WriteFloat(ChargeTime);
+      if (ChargeTime != 0L) {
+        output.WriteRawTag(57);
+        output.WriteSFixed64(ChargeTime);
       }
       if (Jump != false) {
         output.WriteRawTag(64);
@@ -4817,11 +4817,11 @@ namespace GameProto {
       if (Skill != false) {
         size += 1 + 1;
       }
-      if (CameraYaw != 0F) {
-        size += 1 + 4;
+      if (CameraYaw != 0L) {
+        size += 1 + 8;
       }
-      if (ChargeTime != 0F) {
-        size += 1 + 4;
+      if (ChargeTime != 0L) {
+        size += 1 + 8;
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -4853,10 +4853,10 @@ namespace GameProto {
       if (other.Skill != false) {
         Skill = other.Skill;
       }
-      if (other.CameraYaw != 0F) {
+      if (other.CameraYaw != 0L) {
         CameraYaw = other.CameraYaw;
       }
-      if (other.ChargeTime != 0F) {
+      if (other.ChargeTime != 0L) {
         ChargeTime = other.ChargeTime;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
@@ -4898,12 +4898,12 @@ namespace GameProto {
             Skill = input.ReadBool();
             break;
           }
-          case 53: {
-            CameraYaw = input.ReadFloat();
+          case 49: {
+            CameraYaw = input.ReadSFixed64();
             break;
           }
-          case 61: {
-            ChargeTime = input.ReadFloat();
+          case 57: {
+            ChargeTime = input.ReadSFixed64();
             break;
           }
           case 64: {
@@ -4949,12 +4949,12 @@ namespace GameProto {
             Skill = input.ReadBool();
             break;
           }
-          case 53: {
-            CameraYaw = input.ReadFloat();
+          case 49: {
+            CameraYaw = input.ReadSFixed64();
             break;
           }
-          case 61: {
-            ChargeTime = input.ReadFloat();
+          case 57: {
+            ChargeTime = input.ReadSFixed64();
             break;
           }
           case 64: {
@@ -5261,10 +5261,10 @@ namespace GameProto {
 
     /// <summary>Field number for the "pos_x" field.</summary>
     public const int PosXFieldNumber = 2;
-    private float posX_;
+    private long posX_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public float PosX {
+    public long PosX {
       get { return posX_; }
       set {
         posX_ = value;
@@ -5273,10 +5273,10 @@ namespace GameProto {
 
     /// <summary>Field number for the "pos_y" field.</summary>
     public const int PosYFieldNumber = 3;
-    private float posY_;
+    private long posY_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public float PosY {
+    public long PosY {
       get { return posY_; }
       set {
         posY_ = value;
@@ -5285,10 +5285,10 @@ namespace GameProto {
 
     /// <summary>Field number for the "pos_z" field.</summary>
     public const int PosZFieldNumber = 4;
-    private float posZ_;
+    private long posZ_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public float PosZ {
+    public long PosZ {
       get { return posZ_; }
       set {
         posZ_ = value;
@@ -5311,9 +5311,9 @@ namespace GameProto {
         return true;
       }
       if (CrystalId != other.CrystalId) return false;
-      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(PosX, other.PosX)) return false;
-      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(PosY, other.PosY)) return false;
-      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(PosZ, other.PosZ)) return false;
+      if (PosX != other.PosX) return false;
+      if (PosY != other.PosY) return false;
+      if (PosZ != other.PosZ) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -5322,9 +5322,9 @@ namespace GameProto {
     public override int GetHashCode() {
       int hash = 1;
       if (CrystalId != 0) hash ^= CrystalId.GetHashCode();
-      if (PosX != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(PosX);
-      if (PosY != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(PosY);
-      if (PosZ != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(PosZ);
+      if (PosX != 0L) hash ^= PosX.GetHashCode();
+      if (PosY != 0L) hash ^= PosY.GetHashCode();
+      if (PosZ != 0L) hash ^= PosZ.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -5347,17 +5347,17 @@ namespace GameProto {
         output.WriteRawTag(8);
         output.WriteInt32(CrystalId);
       }
-      if (PosX != 0F) {
-        output.WriteRawTag(21);
-        output.WriteFloat(PosX);
+      if (PosX != 0L) {
+        output.WriteRawTag(17);
+        output.WriteSFixed64(PosX);
       }
-      if (PosY != 0F) {
-        output.WriteRawTag(29);
-        output.WriteFloat(PosY);
+      if (PosY != 0L) {
+        output.WriteRawTag(25);
+        output.WriteSFixed64(PosY);
       }
-      if (PosZ != 0F) {
-        output.WriteRawTag(37);
-        output.WriteFloat(PosZ);
+      if (PosZ != 0L) {
+        output.WriteRawTag(33);
+        output.WriteSFixed64(PosZ);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -5373,17 +5373,17 @@ namespace GameProto {
         output.WriteRawTag(8);
         output.WriteInt32(CrystalId);
       }
-      if (PosX != 0F) {
-        output.WriteRawTag(21);
-        output.WriteFloat(PosX);
+      if (PosX != 0L) {
+        output.WriteRawTag(17);
+        output.WriteSFixed64(PosX);
       }
-      if (PosY != 0F) {
-        output.WriteRawTag(29);
-        output.WriteFloat(PosY);
+      if (PosY != 0L) {
+        output.WriteRawTag(25);
+        output.WriteSFixed64(PosY);
       }
-      if (PosZ != 0F) {
-        output.WriteRawTag(37);
-        output.WriteFloat(PosZ);
+      if (PosZ != 0L) {
+        output.WriteRawTag(33);
+        output.WriteSFixed64(PosZ);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -5398,14 +5398,14 @@ namespace GameProto {
       if (CrystalId != 0) {
         size += 1 + pb::CodedOutputStream.ComputeInt32Size(CrystalId);
       }
-      if (PosX != 0F) {
-        size += 1 + 4;
+      if (PosX != 0L) {
+        size += 1 + 8;
       }
-      if (PosY != 0F) {
-        size += 1 + 4;
+      if (PosY != 0L) {
+        size += 1 + 8;
       }
-      if (PosZ != 0F) {
-        size += 1 + 4;
+      if (PosZ != 0L) {
+        size += 1 + 8;
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -5422,13 +5422,13 @@ namespace GameProto {
       if (other.CrystalId != 0) {
         CrystalId = other.CrystalId;
       }
-      if (other.PosX != 0F) {
+      if (other.PosX != 0L) {
         PosX = other.PosX;
       }
-      if (other.PosY != 0F) {
+      if (other.PosY != 0L) {
         PosY = other.PosY;
       }
-      if (other.PosZ != 0F) {
+      if (other.PosZ != 0L) {
         PosZ = other.PosZ;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
@@ -5454,16 +5454,16 @@ namespace GameProto {
             CrystalId = input.ReadInt32();
             break;
           }
-          case 21: {
-            PosX = input.ReadFloat();
+          case 17: {
+            PosX = input.ReadSFixed64();
             break;
           }
-          case 29: {
-            PosY = input.ReadFloat();
+          case 25: {
+            PosY = input.ReadSFixed64();
             break;
           }
-          case 37: {
-            PosZ = input.ReadFloat();
+          case 33: {
+            PosZ = input.ReadSFixed64();
             break;
           }
         }
@@ -5489,16 +5489,16 @@ namespace GameProto {
             CrystalId = input.ReadInt32();
             break;
           }
-          case 21: {
-            PosX = input.ReadFloat();
+          case 17: {
+            PosX = input.ReadSFixed64();
             break;
           }
-          case 29: {
-            PosY = input.ReadFloat();
+          case 25: {
+            PosY = input.ReadSFixed64();
             break;
           }
-          case 37: {
-            PosZ = input.ReadFloat();
+          case 33: {
+            PosZ = input.ReadSFixed64();
             break;
           }
         }
@@ -6367,13 +6367,13 @@ namespace GameProto {
 
     /// <summary>Field number for the "pos_x" field.</summary>
     public const int PosXFieldNumber = 2;
-    private float posX_;
+    private long posX_;
     /// <summary>
     /// 复活点位置
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public float PosX {
+    public long PosX {
       get { return posX_; }
       set {
         posX_ = value;
@@ -6382,10 +6382,10 @@ namespace GameProto {
 
     /// <summary>Field number for the "pos_y" field.</summary>
     public const int PosYFieldNumber = 3;
-    private float posY_;
+    private long posY_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public float PosY {
+    public long PosY {
       get { return posY_; }
       set {
         posY_ = value;
@@ -6394,10 +6394,10 @@ namespace GameProto {
 
     /// <summary>Field number for the "pos_z" field.</summary>
     public const int PosZFieldNumber = 4;
-    private float posZ_;
+    private long posZ_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public float PosZ {
+    public long PosZ {
       get { return posZ_; }
       set {
         posZ_ = value;
@@ -6420,9 +6420,9 @@ namespace GameProto {
         return true;
       }
       if (PlayerId != other.PlayerId) return false;
-      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(PosX, other.PosX)) return false;
-      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(PosY, other.PosY)) return false;
-      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(PosZ, other.PosZ)) return false;
+      if (PosX != other.PosX) return false;
+      if (PosY != other.PosY) return false;
+      if (PosZ != other.PosZ) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -6431,9 +6431,9 @@ namespace GameProto {
     public override int GetHashCode() {
       int hash = 1;
       if (PlayerId != 0) hash ^= PlayerId.GetHashCode();
-      if (PosX != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(PosX);
-      if (PosY != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(PosY);
-      if (PosZ != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(PosZ);
+      if (PosX != 0L) hash ^= PosX.GetHashCode();
+      if (PosY != 0L) hash ^= PosY.GetHashCode();
+      if (PosZ != 0L) hash ^= PosZ.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -6456,17 +6456,17 @@ namespace GameProto {
         output.WriteRawTag(8);
         output.WriteInt32(PlayerId);
       }
-      if (PosX != 0F) {
-        output.WriteRawTag(21);
-        output.WriteFloat(PosX);
+      if (PosX != 0L) {
+        output.WriteRawTag(17);
+        output.WriteSFixed64(PosX);
       }
-      if (PosY != 0F) {
-        output.WriteRawTag(29);
-        output.WriteFloat(PosY);
+      if (PosY != 0L) {
+        output.WriteRawTag(25);
+        output.WriteSFixed64(PosY);
       }
-      if (PosZ != 0F) {
-        output.WriteRawTag(37);
-        output.WriteFloat(PosZ);
+      if (PosZ != 0L) {
+        output.WriteRawTag(33);
+        output.WriteSFixed64(PosZ);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -6482,17 +6482,17 @@ namespace GameProto {
         output.WriteRawTag(8);
         output.WriteInt32(PlayerId);
       }
-      if (PosX != 0F) {
-        output.WriteRawTag(21);
-        output.WriteFloat(PosX);
+      if (PosX != 0L) {
+        output.WriteRawTag(17);
+        output.WriteSFixed64(PosX);
       }
-      if (PosY != 0F) {
-        output.WriteRawTag(29);
-        output.WriteFloat(PosY);
+      if (PosY != 0L) {
+        output.WriteRawTag(25);
+        output.WriteSFixed64(PosY);
       }
-      if (PosZ != 0F) {
-        output.WriteRawTag(37);
-        output.WriteFloat(PosZ);
+      if (PosZ != 0L) {
+        output.WriteRawTag(33);
+        output.WriteSFixed64(PosZ);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -6507,14 +6507,14 @@ namespace GameProto {
       if (PlayerId != 0) {
         size += 1 + pb::CodedOutputStream.ComputeInt32Size(PlayerId);
       }
-      if (PosX != 0F) {
-        size += 1 + 4;
+      if (PosX != 0L) {
+        size += 1 + 8;
       }
-      if (PosY != 0F) {
-        size += 1 + 4;
+      if (PosY != 0L) {
+        size += 1 + 8;
       }
-      if (PosZ != 0F) {
-        size += 1 + 4;
+      if (PosZ != 0L) {
+        size += 1 + 8;
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -6531,13 +6531,13 @@ namespace GameProto {
       if (other.PlayerId != 0) {
         PlayerId = other.PlayerId;
       }
-      if (other.PosX != 0F) {
+      if (other.PosX != 0L) {
         PosX = other.PosX;
       }
-      if (other.PosY != 0F) {
+      if (other.PosY != 0L) {
         PosY = other.PosY;
       }
-      if (other.PosZ != 0F) {
+      if (other.PosZ != 0L) {
         PosZ = other.PosZ;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
@@ -6563,16 +6563,16 @@ namespace GameProto {
             PlayerId = input.ReadInt32();
             break;
           }
-          case 21: {
-            PosX = input.ReadFloat();
+          case 17: {
+            PosX = input.ReadSFixed64();
             break;
           }
-          case 29: {
-            PosY = input.ReadFloat();
+          case 25: {
+            PosY = input.ReadSFixed64();
             break;
           }
-          case 37: {
-            PosZ = input.ReadFloat();
+          case 33: {
+            PosZ = input.ReadSFixed64();
             break;
           }
         }
@@ -6598,16 +6598,16 @@ namespace GameProto {
             PlayerId = input.ReadInt32();
             break;
           }
-          case 21: {
-            PosX = input.ReadFloat();
+          case 17: {
+            PosX = input.ReadSFixed64();
             break;
           }
-          case 29: {
-            PosY = input.ReadFloat();
+          case 25: {
+            PosY = input.ReadSFixed64();
             break;
           }
-          case 37: {
-            PosZ = input.ReadFloat();
+          case 33: {
+            PosZ = input.ReadSFixed64();
             break;
           }
         }

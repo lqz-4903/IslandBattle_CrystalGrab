@@ -1,5 +1,7 @@
 package.path = package.path .. ";Assets/Lua/Libs/?.lua"
 package.path = package.path .. ";Assets/Lua/UI/?.lua"
+package.path = package.path .. ";Assets/Lua/Core/?.lua"
+package.path = package.path .. ";Assets/Lua/Battle/?.lua"
 
 ----- 常用别名
 -- 面向对象父类

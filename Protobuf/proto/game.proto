@@ -134,8 +134,8 @@ message PlayerInput{
 	bool   jump	        = 8;  // 是否跳了
 	bool   attack				= 4;	// 左键点击（这一tick按下）
 	bool   skill				= 5;	// 右键松开（蓄力释放 仅松开那一tick为true）
-	float  camera_yaw		= 6;	// 摄像机水平角度（度） 决定WASD的前方
-	float  charge_time	= 7;	// 右键蓄力时长（秒） skill = true 时有效
+	sfixed64 camera_yaw		= 6;	// 摄像机水平角度（度） 决定WASD的前方
+	sfixed64 charge_time	= 7;	// 右键蓄力时长（秒） skill = true 时有效
 
 }
 
@@ -154,9 +154,9 @@ message InputTick{
 // 30
 message CrystalSpawn{
 	int32 crystal_id = 1;
-	float pos_x		 	 = 2;
-	float pos_y		   = 3;
-	float pos_z 	   = 4;
+	sfixed64 pos_x		 	 = 2;
+	sfixed64 pos_y		   = 3;
+	sfixed64 pos_z 	   = 4;
 }
 
 // 31
@@ -182,9 +182,9 @@ message PlayerFall{
 // 35
 message PlayerRespawn {
 	int32  player_id = 1;
-	float  pos_x     = 2;  // 复活点位置
-	float  pos_y     = 3;
-	float  pos_z     = 4;
+	sfixed64  pos_x     = 2;  // 复活点位置
+	sfixed64  pos_y     = 3;
+	sfixed64  pos_z     = 4;
 }
 
 // 34

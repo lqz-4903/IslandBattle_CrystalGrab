@@ -84,6 +84,9 @@ public class NetMgr : MonoBehaviour
     private float _heartbeatSendTimer = 0f;
     private const float HeartbeatSendInterval = 2f;
 
+    // 上次打印 Send 日志时的 ClientConv（避免帧同步每帧刷屏）
+    private uint _lastLoggedClientConv;
+
     private void Awake()
     {
         instance = this;
@@ -164,7 +167,12 @@ public class NetMgr : MonoBehaviour
     public void Send(NetMessage msg)
     {
         uint clientConv = KcpMgr.Instance.ClientConv;
-        Debug.Log("【NetMgr】Send 被调用 ClientConv=" + clientConv);
+        // 仅在 ClientConv 变化时打印（避免帧同步每 1/15s 刷屏）
+        if (_lastLoggedClientConv != clientConv)
+        {
+            _lastLoggedClientConv = clientConv;
+            Debug.Log("【NetMgr】Send 被调用 ClientConv=" + clientConv);
+        }
         if (clientConv == 0)
         {
             Debug.LogWarning("【NetMgr】ClientConv 为 0，KCP 握手可能尚未完成，消息未发送");
