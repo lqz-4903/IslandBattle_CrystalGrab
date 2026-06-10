@@ -63,29 +63,30 @@ namespace GameProto {
             "ASABKAUiCwoJU3RhcnRHYW1lInYKCUdhbWVTdGFydBITCgtyYW5kb21fc2Vl",
             "ZBgBIAEoBRIUCgxwbGF5ZXJfY291bnQYAiABKAUSFQoNZ2FtZV9kdXJhdGlv",
             "bhgDIAEoAhIUCgx0YXJnZXRfc2NvcmUYBCABKAUSEQoJdGlja19yYXRlGAUg",
-            "ASgFIpYBCgtQbGF5ZXJJbnB1dBIRCglwbGF5ZXJfaWQYASABKAUSDAoEdGlj",
+            "ASgFItgBCgtQbGF5ZXJJbnB1dBIRCglwbGF5ZXJfaWQYASABKAUSDAoEdGlj",
             "axgCIAEoBRIQCghtb3ZlX2RpchgDIAEoDRIMCgRqdW1wGAggASgIEg4KBmF0",
             "dGFjaxgEIAEoCBINCgVza2lsbBgFIAEoCBISCgpjYW1lcmFfeWF3GAYgASgQ",
-            "EhMKC2NoYXJnZV90aW1lGAcgASgQIjwKCUlucHV0VGljaxIMCgR0aWNrGAEg",
-            "ASgFEiEKBmlucHV0cxgCIAMoCzIRLkdhbWUuUGxheWVySW5wdXQiTwoMQ3J5",
-            "c3RhbFNwYXduEhIKCmNyeXN0YWxfaWQYASABKAUSDQoFcG9zX3gYAiABKBAS",
-            "DQoFcG9zX3kYAyABKBASDQoFcG9zX3oYBCABKBAiSQoNQ3J5c3RhbFBpY2t1",
-            "cBISCgpjcnlzdGFsX2lkGAEgASgFEhEKCXBsYXllcl9pZBgCIAEoBRIRCglu",
-            "ZXdfc2NvcmUYAyABKAUiSgoJUGxheWVySGl0EhMKC2F0dGFja2VyX2lkGAEg",
-            "ASgFEhEKCXZpY3RpbV9pZBgCIAEoBRIVCg1kcm9wcGVkX2NvdW50GAMgASgF",
-            "IjYKClBsYXllckZhbGwSEQoJcGxheWVyX2lkGAEgASgFEhUKDWRyb3BwZWRf",
-            "Y291bnQYAiABKAUiTwoNUGxheWVyUmVzcGF3bhIRCglwbGF5ZXJfaWQYASAB",
-            "KAUSDQoFcG9zX3gYAiABKBASDQoFcG9zX3kYAyABKBASDQoFcG9zX3oYBCAB",
-            "KBAiQQoHR2FtZUVuZBIOCgZzY29yZXMYASADKAUSEQoJd2lubmVyX2lkGAIg",
-            "ASgFEhMKC3dpbm5lcl9uYW1lGAMgASgJIikKD0dhbWVUaW1lclVwZGF0ZRIW",
-            "Cg5yZW1haW5pbmdfdGltZRgBIAEoAiI3Cg1QbGF5ZXJPZmZsaW5lEhEKCXBs",
-            "YXllcl9pZBgBIAEoBRITCgtwbGF5ZXJfbmFtZRgCIAEoCSIxCglSZWNvbm5l",
-            "Y3QSEQoJcGxheWVyX2lkGAEgASgFEhEKCWxhc3RfdGljaxgCIAEoBSJTCgxS",
-            "ZWNvbm5lY3RBY2sSDwoHc3VjY2VzcxgBIAEoCBIVCg1jYXRjaF91cF9mcm9t",
-            "GAIgASgFEhsKE2N1cnJlbnRfc2VydmVyX3RpY2sYAyABKAUiUgoMQ2F0Y2hV",
-            "cFRpY2tzEhEKCWZyb21fdGljaxgBIAEoBRIPCgd0b190aWNrGAIgASgFEh4K",
-            "BXRpY2tzGAMgAygLMg8uR2FtZS5JbnB1dFRpY2tCDKoCCUdhbWVQcm90b2IG",
-            "cHJvdG8z"));
+            "EhMKC2NoYXJnZV90aW1lGAcgASgQEhQKDHJlc3VsdF9wb3NfeBgJIAEoEBIU",
+            "CgxyZXN1bHRfcG9zX3kYCiABKBASFAoMcmVzdWx0X3Bvc196GAsgASgQIjwK",
+            "CUlucHV0VGljaxIMCgR0aWNrGAEgASgFEiEKBmlucHV0cxgCIAMoCzIRLkdh",
+            "bWUuUGxheWVySW5wdXQiTwoMQ3J5c3RhbFNwYXduEhIKCmNyeXN0YWxfaWQY",
+            "ASABKAUSDQoFcG9zX3gYAiABKBASDQoFcG9zX3kYAyABKBASDQoFcG9zX3oY",
+            "BCABKBAiSQoNQ3J5c3RhbFBpY2t1cBISCgpjcnlzdGFsX2lkGAEgASgFEhEK",
+            "CXBsYXllcl9pZBgCIAEoBRIRCgluZXdfc2NvcmUYAyABKAUiSgoJUGxheWVy",
+            "SGl0EhMKC2F0dGFja2VyX2lkGAEgASgFEhEKCXZpY3RpbV9pZBgCIAEoBRIV",
+            "Cg1kcm9wcGVkX2NvdW50GAMgASgFIjYKClBsYXllckZhbGwSEQoJcGxheWVy",
+            "X2lkGAEgASgFEhUKDWRyb3BwZWRfY291bnQYAiABKAUiTwoNUGxheWVyUmVz",
+            "cGF3bhIRCglwbGF5ZXJfaWQYASABKAUSDQoFcG9zX3gYAiABKBASDQoFcG9z",
+            "X3kYAyABKBASDQoFcG9zX3oYBCABKBAiQQoHR2FtZUVuZBIOCgZzY29yZXMY",
+            "ASADKAUSEQoJd2lubmVyX2lkGAIgASgFEhMKC3dpbm5lcl9uYW1lGAMgASgJ",
+            "IikKD0dhbWVUaW1lclVwZGF0ZRIWCg5yZW1haW5pbmdfdGltZRgBIAEoAiI3",
+            "Cg1QbGF5ZXJPZmZsaW5lEhEKCXBsYXllcl9pZBgBIAEoBRITCgtwbGF5ZXJf",
+            "bmFtZRgCIAEoCSIxCglSZWNvbm5lY3QSEQoJcGxheWVyX2lkGAEgASgFEhEK",
+            "CWxhc3RfdGljaxgCIAEoBSJTCgxSZWNvbm5lY3RBY2sSDwoHc3VjY2VzcxgB",
+            "IAEoCBIVCg1jYXRjaF91cF9mcm9tGAIgASgFEhsKE2N1cnJlbnRfc2VydmVy",
+            "X3RpY2sYAyABKAUiUgoMQ2F0Y2hVcFRpY2tzEhEKCWZyb21fdGljaxgBIAEo",
+            "BRIPCgd0b190aWNrGAIgASgFEh4KBXRpY2tzGAMgAygLMg8uR2FtZS5JbnB1",
+            "dFRpY2tCDKoCCUdhbWVQcm90b2IGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
@@ -102,7 +103,7 @@ namespace GameProto {
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.ReturnToRoom), global::GameProto.ReturnToRoom.Parser, new[]{ "PlayerId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.StartGame), global::GameProto.StartGame.Parser, null, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.GameStart), global::GameProto.GameStart.Parser, new[]{ "RandomSeed", "PlayerCount", "GameDuration", "TargetScore", "TickRate" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerInput), global::GameProto.PlayerInput.Parser, new[]{ "PlayerId", "Tick", "MoveDir", "Jump", "Attack", "Skill", "CameraYaw", "ChargeTime" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerInput), global::GameProto.PlayerInput.Parser, new[]{ "PlayerId", "Tick", "MoveDir", "Jump", "Attack", "Skill", "CameraYaw", "ChargeTime", "ResultPosX", "ResultPosY", "ResultPosZ" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.InputTick), global::GameProto.InputTick.Parser, new[]{ "Tick", "Inputs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.CrystalSpawn), global::GameProto.CrystalSpawn.Parser, new[]{ "CrystalId", "PosX", "PosY", "PosZ" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.CrystalPickup), global::GameProto.CrystalPickup.Parser, new[]{ "CrystalId", "PlayerId", "NewScore" }, null, null, null, null),
@@ -4536,6 +4537,9 @@ namespace GameProto {
       skill_ = other.skill_;
       cameraYaw_ = other.cameraYaw_;
       chargeTime_ = other.chargeTime_;
+      resultPosX_ = other.resultPosX_;
+      resultPosY_ = other.resultPosY_;
+      resultPosZ_ = other.resultPosZ_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -4659,6 +4663,45 @@ namespace GameProto {
       }
     }
 
+    /// <summary>Field number for the "result_pos_x" field.</summary>
+    public const int ResultPosXFieldNumber = 9;
+    private long resultPosX_;
+    /// <summary>
+    /// Phase 2: 服务端权威位置（执行完上一 tick 后的位置，用于客户端校正）
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public long ResultPosX {
+      get { return resultPosX_; }
+      set {
+        resultPosX_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "result_pos_y" field.</summary>
+    public const int ResultPosYFieldNumber = 10;
+    private long resultPosY_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public long ResultPosY {
+      get { return resultPosY_; }
+      set {
+        resultPosY_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "result_pos_z" field.</summary>
+    public const int ResultPosZFieldNumber = 11;
+    private long resultPosZ_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public long ResultPosZ {
+      get { return resultPosZ_; }
+      set {
+        resultPosZ_ = value;
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -4682,6 +4725,9 @@ namespace GameProto {
       if (Skill != other.Skill) return false;
       if (CameraYaw != other.CameraYaw) return false;
       if (ChargeTime != other.ChargeTime) return false;
+      if (ResultPosX != other.ResultPosX) return false;
+      if (ResultPosY != other.ResultPosY) return false;
+      if (ResultPosZ != other.ResultPosZ) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -4697,6 +4743,9 @@ namespace GameProto {
       if (Skill != false) hash ^= Skill.GetHashCode();
       if (CameraYaw != 0L) hash ^= CameraYaw.GetHashCode();
       if (ChargeTime != 0L) hash ^= ChargeTime.GetHashCode();
+      if (ResultPosX != 0L) hash ^= ResultPosX.GetHashCode();
+      if (ResultPosY != 0L) hash ^= ResultPosY.GetHashCode();
+      if (ResultPosZ != 0L) hash ^= ResultPosZ.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -4747,6 +4796,18 @@ namespace GameProto {
         output.WriteRawTag(64);
         output.WriteBool(Jump);
       }
+      if (ResultPosX != 0L) {
+        output.WriteRawTag(73);
+        output.WriteSFixed64(ResultPosX);
+      }
+      if (ResultPosY != 0L) {
+        output.WriteRawTag(81);
+        output.WriteSFixed64(ResultPosY);
+      }
+      if (ResultPosZ != 0L) {
+        output.WriteRawTag(89);
+        output.WriteSFixed64(ResultPosZ);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -4789,6 +4850,18 @@ namespace GameProto {
         output.WriteRawTag(64);
         output.WriteBool(Jump);
       }
+      if (ResultPosX != 0L) {
+        output.WriteRawTag(73);
+        output.WriteSFixed64(ResultPosX);
+      }
+      if (ResultPosY != 0L) {
+        output.WriteRawTag(81);
+        output.WriteSFixed64(ResultPosY);
+      }
+      if (ResultPosZ != 0L) {
+        output.WriteRawTag(89);
+        output.WriteSFixed64(ResultPosZ);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -4821,6 +4894,15 @@ namespace GameProto {
         size += 1 + 8;
       }
       if (ChargeTime != 0L) {
+        size += 1 + 8;
+      }
+      if (ResultPosX != 0L) {
+        size += 1 + 8;
+      }
+      if (ResultPosY != 0L) {
+        size += 1 + 8;
+      }
+      if (ResultPosZ != 0L) {
         size += 1 + 8;
       }
       if (_unknownFields != null) {
@@ -4858,6 +4940,15 @@ namespace GameProto {
       }
       if (other.ChargeTime != 0L) {
         ChargeTime = other.ChargeTime;
+      }
+      if (other.ResultPosX != 0L) {
+        ResultPosX = other.ResultPosX;
+      }
+      if (other.ResultPosY != 0L) {
+        ResultPosY = other.ResultPosY;
+      }
+      if (other.ResultPosZ != 0L) {
+        ResultPosZ = other.ResultPosZ;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -4910,6 +5001,18 @@ namespace GameProto {
             Jump = input.ReadBool();
             break;
           }
+          case 73: {
+            ResultPosX = input.ReadSFixed64();
+            break;
+          }
+          case 81: {
+            ResultPosY = input.ReadSFixed64();
+            break;
+          }
+          case 89: {
+            ResultPosZ = input.ReadSFixed64();
+            break;
+          }
         }
       }
     #endif
@@ -4959,6 +5062,18 @@ namespace GameProto {
           }
           case 64: {
             Jump = input.ReadBool();
+            break;
+          }
+          case 73: {
+            ResultPosX = input.ReadSFixed64();
+            break;
+          }
+          case 81: {
+            ResultPosY = input.ReadSFixed64();
+            break;
+          }
+          case 89: {
+            ResultPosZ = input.ReadSFixed64();
             break;
           }
         }

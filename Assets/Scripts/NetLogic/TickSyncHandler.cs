@@ -79,6 +79,13 @@ public class TickSyncHandler
     private Dictionary<int, PlayerInput> _currentTickInputs = new();
 
     /// <summary>
+    /// Phase 2: 上一 tick 执行后的服务端权威位置。
+    /// 由 Lua PlayerManager 在主机 OnFrameEnd 后通过 HostServer 桥接填入。
+    /// 在组装下一 tick 的 InputTick 时附加到 PlayerInput.ResultPosX/Y/Z 中。
+    /// </summary>
+    private Dictionary<int, (long x, long y, long z)> _previousTickPositions = new();
+
+    /// <summary>
     /// 帧历史：用于断线重连时发送 CatchUpTicks
     /// </summary>
     private List<InputTick> _tickHistory = new();
@@ -108,6 +115,7 @@ public class TickSyncHandler
         _isWaitingForInput = false;
         _activePlayers.Clear();
         _currentTickInputs.Clear();
+        _previousTickPositions.Clear();
         _tickHistory.Clear();
 
         foreach (int id in playerIds)
@@ -181,6 +189,9 @@ public class TickSyncHandler
     {
         _currentTick++;
         _currentTickInputs.Clear();
+        // ★ 不在此处清除 _previousTickPositions — 位置由 _CaptureAuthPositions 在
+        //   tick N 执行后写入，需要保留到 FinalizeTick(N+1) 才能附加到 InputTick。
+        //   清除统一在 FinalizeTick() 读取后执行。
         _waitTimer = Fix64.Zero;
         _isWaitingForInput = true;
     }
@@ -201,14 +212,15 @@ public class TickSyncHandler
 
         foreach (int playerId in _activePlayers)
         {
-            if (_currentTickInputs.TryGetValue(playerId, out PlayerInput input))
+            PlayerInput input;
+            if (_currentTickInputs.TryGetValue(playerId, out PlayerInput existing))
             {
-                inputTick.Inputs.Add(input);
+                input = existing;
             }
             else
             {
                 // 超时：填充空输入
-                inputTick.Inputs.Add(new PlayerInput
+                input = new PlayerInput
                 {
                     PlayerId = playerId,
                     Tick = _currentTick,
@@ -218,9 +230,22 @@ public class TickSyncHandler
                     Skill = false,
                     CameraYaw = 0L,
                     ChargeTime = 0L
-                });
+                };
             }
+
+            // Phase 2: 附加上一 tick 执行后的服务端权威位置
+            if (_previousTickPositions.TryGetValue(playerId, out var authPos))
+            {
+                input.ResultPosX = authPos.x;
+                input.ResultPosY = authPos.y;
+                input.ResultPosZ = authPos.z;
+            }
+
+            inputTick.Inputs.Add(input);
         }
+
+        // 清空上一 tick 位置（仅使用一次）
+        _previousTickPositions.Clear();
 
         // 保存到帧历史
         _tickHistory.Add(inputTick);
@@ -277,6 +302,16 @@ public class TickSyncHandler
             CameraYaw = cameraYaw.Raw,
             ChargeTime = chargeTime.Raw
         };
+    }
+
+    /// <summary>
+    /// Phase 2: 记录单个玩家在上一 tick 执行后的权威位置。
+    /// 由 HostServer.SubmitAuthPosition() 桥接，供 Lua PlayerManager 调用。
+    /// xRaw/yRaw/zRaw 均为 Fix64.Raw（long），直接来自 Unity Transform。
+    /// </summary>
+    public void RecordPlayerAuthPosition(int playerId, long xRaw, long yRaw, long zRaw)
+    {
+        _previousTickPositions[playerId] = (xRaw, yRaw, zRaw);
     }
 
     #endregion

@@ -181,6 +181,10 @@ function PlayerController:_ApplyLocalMovement(dt)
         end
     end
 
+    -- ★ 主机模式：移动由 PlayerManager:_ApplyDeterministicMovement 统一计算（15fps）
+    --    不再自己做 controller:Move，与远程玩家走同一条物理路径，消除幻影漂移
+    if self.isHost then return end
+
     -- ==== 水平移动 ====
     local hSpeed = 0
     local hVelocity

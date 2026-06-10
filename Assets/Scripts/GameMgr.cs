@@ -10,14 +10,9 @@ public class GameMgr : MonoBehaviour
         {
             if (_instance == null)
             {
-                // 优先查找场景中已存在的 GameMgr
-                _instance = FindObjectOfType<GameMgr>();
-                if (_instance == null)
-                {
-                    GameObject go = new GameObject("GameMgr");
-                    _instance = go.AddComponent<GameMgr>();
-                    DontDestroyOnLoad(go);
-                }
+                GameObject go = new GameObject("GameMgr");
+                _instance = go.AddComponent<GameMgr>();
+                DontDestroyOnLoad(go);
             }
             return _instance;
         }

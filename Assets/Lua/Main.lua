@@ -91,6 +91,9 @@ local function InitGame()
     -- 6. 启动本地玩家控制器（输入采集 + 移动 + 摄像机）
     PlayerController:Init(localPlayerId, isHost)
 
+    -- 7. 注册测试快捷键（T=全部测试, Y=阻塞性测试）
+    require("Test.TestRunner").RegisterHotkey()
+
     print("[Main] ====== 游戏初始化完成 ======")
 end
 

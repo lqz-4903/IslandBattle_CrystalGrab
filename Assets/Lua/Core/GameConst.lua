@@ -26,7 +26,13 @@ GC.TICK_INTERVAL   = 1 / 15   -- 每帧间隔（秒）
 GC.MOVE_SPEED      = 5        -- 玩家移动速度（米/秒）
 GC.JUMP_FORCE      = 8        -- 跳跃初速度
 GC.GRAVITY         = 20       -- 重力加速度
+GC.PHYSICS_SUBSTEPS = 8        -- 远程玩家每 tick 物理子步数（匹配 120fps 碰撞精度，缩小主机端远程玩家与客户端自视的差异）
 GC.MOUSE_SENSITIVITY = 0.003 -- 鼠标灵敏度（每像素旋转弧度，0.003≈0.17°/像素）
+
+-- ========== 网络插值参数（消除 15fps tick → 60fps 渲染的卡顿）==========
+GC.INTERP_INTERVAL    = 1 / 15   -- 插值时间窗口（与 TICK_RATE 一致）
+GC.INTERP_MAX_EXTRAP  = 2        -- 最大外推 tick 数（tick 延迟时短暂外推）
+GC.INTERP_ROT_SPEED   = 720      -- 旋转插值速度（度/秒），使用 RotateTowards
 
 -- ========== 网络消息 ID ==========
 GC.MSG_ID = {

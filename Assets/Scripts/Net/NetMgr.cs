@@ -89,7 +89,13 @@ public class NetMgr : MonoBehaviour
 
     private void Awake()
     {
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
         instance = this;
+        DontDestroyOnLoad(gameObject);
     }
 
     #region 每帧 Update（双端通用）

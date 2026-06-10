@@ -112,10 +112,18 @@ function Fix64.sqrt(a)
         bit = bit >> 2
     end
 
-    -- Newton 精修 1 轮（安全分解，避免 a.raw * ONE 溢出）
+    -- Newton 精修 1 轮：r' = (r + a/r) / 2
+    -- ★ 使用 2 级分解避免 rem * ONE 溢出 Lua 53 位精度：
+    --   floor(rem * ONE / result) 拆为 floor(rem * 2^16 / result) * 2^16
+    --   + floor((rem * 2^16 % result) * 2^16 / result)
+    --   每级乘积 ≤ result * 2^16 ≈ 6e9 * 65536 ≈ 3.9e14 < 2^53 (9e15)
     local quot = math.floor(a.raw / result)
     local rem = a.raw % result
-    local div = quot * ONE + math.floor(rem * ONE / result)
+    local S = 65536  -- 2^16
+    local q1 = math.floor(rem * S / result)
+    local r1 = (rem * S) % result
+    local q2 = math.floor(r1 * S / result)
+    local div = quot * ONE + q1 * S + q2
     result = (result + div) >> 1
 
     return Fix64.new(result)

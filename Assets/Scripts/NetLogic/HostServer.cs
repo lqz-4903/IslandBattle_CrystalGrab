@@ -694,6 +694,17 @@ public class HostServer : MonoBehaviour
         _tickSyncHandler.SubmitLocalInput(hostPlayerId, moveDir, jump, attack, skill,
             new Fix64(cameraYawRaw), new Fix64(chargeTimeRaw));
     }
+
+    /// <summary>
+    /// Phase 2: Lua→C# 桥接 — 主机端提交单个玩家的权威位置。
+    /// 由 Lua PlayerManager:_CaptureAuthPositions() 在 OnFrameEnd 后调用。
+    /// xRaw/yRaw/zRaw 为 Fix64.Raw（long），由 Lua 侧 CS.Fix64.FromFloat().Raw 转换。
+    /// </summary>
+    public void SubmitAuthPosition(int playerId, long xRaw, long yRaw, long zRaw)
+    {
+        if (!_isRunning || !_isGameStarted) return;
+        _tickSyncHandler.RecordPlayerAuthPosition(playerId, xRaw, yRaw, zRaw);
+    }
     #endregion
 
     #region =============== 帧就绪回调 ===============

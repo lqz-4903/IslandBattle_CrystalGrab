@@ -39,7 +39,7 @@ public readonly struct Fix64 : IEquatable<Fix64>, IComparable<Fix64>
     public static Fix64 FromInt(int value) => new Fix64((long)value << FRACTIONAL_BITS);
 
     /// <summary>从float构造（注意：float本身不精确，仅用于初始化常量）</summary>
-    public static Fix64 FromFloat(float value) => new Fix64((long)(value * ONE));
+    public static Fix64 FromFloat(float value) => new Fix64((long)((double)value * ONE));
 
     /// <summary>从double构造</summary>
     public static Fix64 FromDouble(double value) => new Fix64((long)(value * ONE));

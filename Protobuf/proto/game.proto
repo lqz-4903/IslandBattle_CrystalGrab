@@ -136,6 +136,10 @@ message PlayerInput{
 	bool   skill				= 5;	// 右键松开（蓄力释放 仅松开那一tick为true）
 	sfixed64 camera_yaw		= 6;	// 摄像机水平角度（度） 决定WASD的前方
 	sfixed64 charge_time	= 7;	// 右键蓄力时长（秒） skill = true 时有效
+	// Phase 2: 服务端权威位置（执行完上一 tick 后的位置，用于客户端校正）
+	sfixed64 result_pos_x = 9;
+	sfixed64 result_pos_y = 10;
+	sfixed64 result_pos_z = 11;
 
 }
 
