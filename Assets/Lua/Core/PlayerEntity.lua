@@ -55,6 +55,11 @@ function PlayerEntity.new(playerId, playerName, isLocal)
     self.velocity   = Vec3.ZERO
     self.isGrounded = true
 
+    -- 跳跃动画状态（远程玩家用）
+    self._isJumpingAnim   = false
+    self._jumpInitiated   = false
+    self._wasGroundedLast = true
+
     return self
 end
 

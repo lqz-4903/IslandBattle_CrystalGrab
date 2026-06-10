@@ -393,15 +393,14 @@ end
 PlayerManager._interpUpdateId = nil
 
 --- 每帧插值远程玩家（60fps 平滑），消除 15fps tick 的卡顿感
+--- ★ 修复：从 _prevPos（tick 前位置）平滑过渡到 _targetPos（tick 后位置）
 function PlayerManager:_InterpolateRemotePlayers(dt)
     for _, player in pairs(self.players) do
         if player.playerId ~= self.localPlayerId and player.isAlive then
-            if player._targetPos ~= nil and player.transform ~= nil then
-                -- 位置插值：每帧向目标位置靠近
-                local current = player.transform.position
-                local target = player._targetPos
+            if player._prevPos ~= nil and player._targetPos ~= nil and player.transform ~= nil then
+                -- ★ 在 tick 前位置和 tick 后位置之间做 Lerp
                 local t = math.min(dt * 15, 1)  -- 插值因子，约 0.25/帧
-                local newPos = CS.UnityEngine.Vector3.Lerp(current, target, t)
+                local newPos = CS.UnityEngine.Vector3.Lerp(player._prevPos, player._targetPos, t)
                 player.transform.position = newPos
             end
             -- 每帧更新远程玩家动画（60fps 平滑）
@@ -417,28 +416,40 @@ function PlayerManager:_ApplyDeterministicMovement(player, dt)
     local moveDir = player.moveDir
     local yawFloat = Fix64.toFloat(player.yaw)
 
+    -- ★ 保存移动前位置，供 60fps 插值器在 _prevPos → _targetPos 之间做 Lerp
+    if player.transform ~= nil then
+        player._prevPos = player.transform.position
+    end
+
     -- 水平移动
     local hVelocity = CS.UnityEngine.Vector3.zero
     local hSpeed = 0
-    if moveDir ~= GC.MOVE_NONE then
+    local dirMask = moveDir & 0x0F  -- 低 4 位 = 移动方向
+    local isRolling = (moveDir & GC.MOVE_ROLL) ~= 0  -- ★ bit 4 = 翻滚
+
+    if dirMask ~= GC.MOVE_NONE then
         local forward = CS.UnityEngine.Vector3(math.sin(yawFloat), 0, math.cos(yawFloat))
         local right   = CS.UnityEngine.Vector3(math.cos(yawFloat), 0, -math.sin(yawFloat))
         local dir = CS.UnityEngine.Vector3.zero
-        if moveDir & GC.MOVE_FORWARD ~= 0 then dir = dir + forward end
-        if moveDir & GC.MOVE_BACKWARD ~= 0 then dir = dir - forward end
-        if moveDir & GC.MOVE_RIGHT ~= 0 then dir = dir + right end
-        if moveDir & GC.MOVE_LEFT ~= 0 then dir = dir - right end
+        if dirMask & GC.MOVE_FORWARD ~= 0 then dir = dir + forward end
+        if dirMask & GC.MOVE_BACKWARD ~= 0 then dir = dir - forward end
+        if dirMask & GC.MOVE_RIGHT ~= 0 then dir = dir + right end
+        if dirMask & GC.MOVE_LEFT ~= 0 then dir = dir - right end
         if dir.magnitude > 1 then dir = dir.normalized end
-        hVelocity = dir * GC.MOVE_SPEED
-        hSpeed = GC.MOVE_SPEED
+        local speed = isRolling and 12 or GC.MOVE_SPEED  -- ★ 翻滚速度 12
+        hVelocity = dir * speed
+        hSpeed = speed
     end
 
     -- 垂直移动
     local vertVelocity
+    local justJumped = false
     if player.isGrounded then
         if player.isJumping then
             vertVelocity = GC.JUMP_FORCE
             player.isGrounded = false
+            justJumped = true
+            player._jumpInitiated = true   -- ★ 通知动画系统起跳
         else
             vertVelocity = -GC.GRAVITY * 0.5
         end
@@ -455,15 +466,22 @@ function PlayerManager:_ApplyDeterministicMovement(player, dt)
     pcall(function() controller:Move(displacement) end)
 
     -- 更新着地
-    local ok, grounded = pcall(function() return controller.isGrounded end)
-    if ok then player.isGrounded = grounded end
+    -- ★ 刚刚起跳时不立即检测着地，防止首帧位移太小（<stepOffset）
+    --    导致 CharacterController.isGrounded 仍为 true 而取消跳跃
+    if not justJumped then
+        local ok, grounded = pcall(function() return controller.isGrounded end)
+        if ok then player.isGrounded = grounded end
+    end
 
     -- 存储速度（供动画用）
     player.velocity = Vec3.new(Fix64.fromFloat(hVelocity.x), Fix64.fromFloat(vertVelocity), Fix64.fromFloat(hVelocity.z))
     player._hSpeed = hSpeed
+    player._isRolling = isRolling
 
-    -- ★ 存储目标位置（供 60fps 插值平滑），同时更新旋转
-    player._targetPos = player.transform.position
+    -- ★ 存储移动后目标位置（供 60fps 插值器从 _prevPos 平滑到 _targetPos）
+    if player.transform ~= nil then
+        player._targetPos = player.transform.position
+    end
     player.transform.rotation = CS.UnityEngine.Quaternion.Euler(0, math.deg(yawFloat), 0)
 end
 
@@ -484,11 +502,20 @@ function PlayerManager:_UpdateRemoteAnimator(player, dt)
         vSpeed = Fix64.toFloat(player.velocity.y)
     end
 
+    -- ★ 跳跃动画：仅在实际起跳时触发，与本地玩家行为一致
+    --    player._jumpInitiated 由 _ApplyDeterministicMovement 设置
+    if player._jumpInitiated then
+        player._isJumpingAnim = true
+        player._jumpInitiated = false
+    elseif player.isGrounded then
+        player._isJumpingAnim = false
+    end
+
     anim:SetFloat("HSpeed", hSpeed)
     anim:SetFloat("VSpeed", vSpeed)
     anim:SetBool("Fire", player.isAttacking)
     anim:SetBool("Skill", player.isUsingSkill)
-    anim:SetBool("Jump", not player.isGrounded)
+    anim:SetBool("Jump", player._isJumpingAnim or false)
     anim:SetBool("Roll", player._isRolling or false)
 end
 

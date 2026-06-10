@@ -84,18 +84,14 @@ end
 
 -- ========== 事件处理器 ==========
 
---- 游戏开始
+--- 游戏开始（客户端路径）
+--- ★ 注：真正的初始化在 Main.lua InitGame() 统一完成，
+---    此回调仅用于日志记录和调试
 --- @param msg GameStart（protobuf）
 function NetworkEventMgr:_OnGameStart(msg)
-    print("[NetworkEventMgr] 游戏开始 种子=" .. msg.RandomSeed .. " 时长=" .. msg.GameDuration)
-
-    -- 获取单例 PlayerManager
-    local pm = PlayerManager.GetInstance()
-    pm:Init()
-
-    -- TODO: 从 PlayerList 获取完整玩家列表并生成所有玩家
-    -- 目前在网络框架中，PlayerList 在 GameStart 之前就已下发
-    -- PlayerList 包含所有玩家的 playerId 和 playerName
+    print("[NetworkEventMgr] 游戏开始 种子=" .. msg.RandomSeed .. " 时长=" .. msg.GameDuration ..
+          " 帧率=" .. (msg.TickRate or 15))
+    -- PlayerManager 初始化由 Main.lua InitGame() 统一处理，此处不重复操作
 end
 
 --- 水晶生成

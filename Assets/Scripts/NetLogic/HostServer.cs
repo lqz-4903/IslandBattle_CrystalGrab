@@ -214,6 +214,7 @@ public class HostServer : MonoBehaviour
             Debug.Log("【HostServer】已在运行中，关闭旧服务后重启...");
             // 停止游戏逻辑
             _isGameStarted = false;
+            _hasGamePlayed = false;  // ★ 重置游戏标记，防止新房间的玩家列表带 \x01
             _tickSyncHandler.Stop();
             _gameEventHandler.Stop();
             // 停止 KCP 服务器
@@ -261,6 +262,11 @@ public class HostServer : MonoBehaviour
 
         _tickSyncHandler.Stop();
         _gameEventHandler.Stop();
+
+        // ★ 清除 KcpMgr 回调，防止后台线程回调到已销毁的 HostServer 实例
+        KcpMgr.Instance.OnClientConnected = null;
+        KcpMgr.Instance.OnClientDisconnected = null;
+        _lastHeartbeatTime.Clear();
 
         try
         {
@@ -462,6 +468,26 @@ public class HostServer : MonoBehaviour
 
         // ★ 移除心跳追踪
         _lastHeartbeatTime.Remove(conv);
+
+        // ★ 游戏中断开：广播 PlayerOffline 通知剩余客户端（与 HandlePlayerTimeout 保持一致）
+        if (_isGameStarted)
+        {
+            int playerId = 0;
+            string playerName = "未知玩家";
+            if (CurrentRoom != null && CurrentRoom.ConvToPlayer.TryGetValue(conv, out ServerPlayer sp))
+            {
+                playerId = sp.PlayerId;
+                playerName = sp.PlayerName;
+            }
+
+            if (playerId > 0)
+            {
+                var playerOffline = new PlayerOffline { PlayerId = playerId, PlayerName = playerName };
+                BroadcastExcept(conv, new NetMessage { PlayerOffline = playerOffline });
+                try { NetMgr.OnPlayerOfflineCallback?.Invoke(playerOffline); }
+                catch (Exception e) { Debug.Log("【HostServer】OnPlayerOfflineCallback 异常：" + e.Message); }
+            }
+        }
 
         // 从房间移除
         _roomHandler.HandlePlayerDisconnect(conv);

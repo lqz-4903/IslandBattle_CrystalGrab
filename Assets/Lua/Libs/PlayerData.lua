@@ -148,4 +148,10 @@ function PlayerData.SetMouseDPI(dpi)
     PlayerData.Save()
 end
 
+-- ★ 实时预览用：只更新内存不写盘（Slider onValueChanged 每帧触发，频繁写盘会卡死）
+function PlayerData.SetMouseDPINoSave(dpi)
+    local data = PlayerData.Load()
+    data.mouseDPI = dpi
+end
+
 return PlayerData

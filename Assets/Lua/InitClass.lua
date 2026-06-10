@@ -20,9 +20,6 @@ require("IsNull")
 DeterministicRandom = require("DeterministicRandom")
 
 ----- 全局Update驱动（由C#侧GameMgr.Update每帧调用）
--- ★ 优化：使用数组+稀疏标记替代 pairs() 迭代，避免每帧分配迭代器
---   RegisterUpdate 返回的 id 是数组下标，UnregisterUpdate 将槽位置为 nil
---   Update 时用数值 for + rawget 跳过 nil 槽位（pairless iteration）
 local updateCallbacks = {}     -- [id] = callback
 local updateNextId = 0          -- 单调递增ID分配器
 local updateNeedCompact = false -- 是否需要压缩数组
@@ -41,7 +38,6 @@ function UnregisterUpdate(id)
 end
 
 function Update(dt)
-    -- 数值 for 循环（无迭代器分配）
     for i = 1, updateNextId do
         local callback = updateCallbacks[i]
         if callback ~= nil then
@@ -68,7 +64,6 @@ function Update(dt)
                     newCallbacks[newId] = cb
                 end
             end
-            -- 替换全局表
             updateCallbacks = newCallbacks
             updateNextId = newId
         end

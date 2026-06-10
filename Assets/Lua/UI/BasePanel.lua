@@ -18,6 +18,9 @@ BasePanel.fadeEndAlpha = 1
 
 function BasePanel:Init(name)
     if IsNull(self.panelObj) then
+        -- ★ 每个面板实例必须有自己独立的 controls 表，防止弹窗面板污染底层面板
+        self.controls = {}
+
         -- 公共的实例化对象的方法
         self.panelObj = ABMgr:LoadRes("ui", name, typeof(GameObject))
         if IsNull(self.panelObj) then

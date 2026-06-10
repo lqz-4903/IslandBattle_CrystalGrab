@@ -2,6 +2,7 @@ using GameProto;
 using Google.Protobuf;
 using System;
 using UnityEngine;
+using UnityEngine.Events;
 
 /// <summary>
 /// ═══════════════════════════════════════════════════════════════
@@ -57,7 +58,22 @@ public static class LuaEventBridge
 
     #endregion
 
-    #region =============== 初始化（由 GameMgr 或 Lua 调用一次） ===============
+    #region =============== 内部：EventCenter 监听器引用（用于正确移除） ===============
+
+    // ★ 存储监听器委托引用，以便 Shutdown() 时能正确从 EventCenter 移除
+    //    之前的实现使用内联 lambda，导致无法 RemoveListener，每次 Initialize/Shutdown 循环都会泄漏
+    private static UnityAction<IMessage> _onCrystalSpawnListener;
+    private static UnityAction<IMessage> _onCrystalPickupListener;
+    private static UnityAction<IMessage> _onPlayerHitListener;
+    private static UnityAction<IMessage> _onPlayerFallListener;
+    private static UnityAction<IMessage> _onPlayerRespawnListener;
+    private static UnityAction<IMessage> _onGameEndListener;
+    private static UnityAction<IMessage> _onPlayerOfflineListener;
+    private static UnityAction<IMessage> _onGameStartListener;
+
+    #endregion
+
+    #region =============== 初始化 / 关闭 ===============
 
     private static bool _initialized;
 
@@ -70,44 +86,70 @@ public static class LuaEventBridge
         if (_initialized) return;
         _initialized = true;
 
-        EventCenter.AddListener(30, (IMessage msg) =>
-        { if (msg is CrystalSpawn m) OnCrystalSpawn?.Invoke(m); });
+        // ★ 保存委托引用，以便 Shutdown 时正确移除
+        _onCrystalSpawnListener = (IMessage msg) =>
+        { if (msg is CrystalSpawn m) OnCrystalSpawn?.Invoke(m); };
+        EventCenter.AddListener(30, _onCrystalSpawnListener);
 
-        EventCenter.AddListener(31, (IMessage msg) =>
-        { if (msg is CrystalPickup m) OnCrystalPickup?.Invoke(m); });
+        _onCrystalPickupListener = (IMessage msg) =>
+        { if (msg is CrystalPickup m) OnCrystalPickup?.Invoke(m); };
+        EventCenter.AddListener(31, _onCrystalPickupListener);
 
-        EventCenter.AddListener(32, (IMessage msg) =>
-        { if (msg is PlayerHit m) OnPlayerHit?.Invoke(m); });
+        _onPlayerHitListener = (IMessage msg) =>
+        { if (msg is PlayerHit m) OnPlayerHit?.Invoke(m); };
+        EventCenter.AddListener(32, _onPlayerHitListener);
 
-        EventCenter.AddListener(33, (IMessage msg) =>
-        { if (msg is PlayerFall m) OnPlayerFall?.Invoke(m); });
+        _onPlayerFallListener = (IMessage msg) =>
+        { if (msg is PlayerFall m) OnPlayerFall?.Invoke(m); };
+        EventCenter.AddListener(33, _onPlayerFallListener);
 
-        EventCenter.AddListener(35, (IMessage msg) =>
-        { if (msg is PlayerRespawn m) OnPlayerRespawn?.Invoke(m); });
+        _onPlayerRespawnListener = (IMessage msg) =>
+        { if (msg is PlayerRespawn m) OnPlayerRespawn?.Invoke(m); };
+        EventCenter.AddListener(35, _onPlayerRespawnListener);
 
-        EventCenter.AddListener(34, (IMessage msg) =>
-        { if (msg is GameEnd m) OnGameEnd?.Invoke(m); });
+        _onGameEndListener = (IMessage msg) =>
+        { if (msg is GameEnd m) OnGameEnd?.Invoke(m); };
+        EventCenter.AddListener(34, _onGameEndListener);
 
-        EventCenter.AddListener(37, (IMessage msg) =>
-        { if (msg is PlayerOffline m) OnPlayerOffline?.Invoke(m); });
+        _onPlayerOfflineListener = (IMessage msg) =>
+        { if (msg is PlayerOffline m) OnPlayerOffline?.Invoke(m); };
+        EventCenter.AddListener(37, _onPlayerOfflineListener);
 
-        EventCenter.AddListener(16, (IMessage msg) =>
-        { if (msg is GameStart m) OnGameStart?.Invoke(m); });
+        _onGameStartListener = (IMessage msg) =>
+        { if (msg is GameStart m) OnGameStart?.Invoke(m); };
+        EventCenter.AddListener(16, _onGameStartListener);
 
         Debug.Log("[LuaEventBridge] 所有游戏事件监听已注册");
     }
 
     /// <summary>
-    /// 移除所有事件监听（切场景/退出时调用）
+    /// 移除所有事件监听，清空 Lua 回调引用。
+    /// ★ 修复：使用存储的委托引用正确移除 EventCenter 监听器，防止泄漏
     /// </summary>
     public static void Shutdown()
     {
         if (!_initialized) return;
         _initialized = false;
 
-        // EventCenter 的 RemoveListener 需要传入原始 delegate，无法直接移除 lambda。
-        // 因此这里不清除单个监听器——EventCenter.Clear() 会在切场景时由 GameMgr 调用。
-        // 仅清空 Lua 回调引用，防止悬挂。
+        // ★ 正确移除 EventCenter 监听器（使用存储的委托引用）
+        if (_onCrystalSpawnListener != null)
+        { EventCenter.RemoveListener(30, _onCrystalSpawnListener); _onCrystalSpawnListener = null; }
+        if (_onCrystalPickupListener != null)
+        { EventCenter.RemoveListener(31, _onCrystalPickupListener); _onCrystalPickupListener = null; }
+        if (_onPlayerHitListener != null)
+        { EventCenter.RemoveListener(32, _onPlayerHitListener); _onPlayerHitListener = null; }
+        if (_onPlayerFallListener != null)
+        { EventCenter.RemoveListener(33, _onPlayerFallListener); _onPlayerFallListener = null; }
+        if (_onPlayerRespawnListener != null)
+        { EventCenter.RemoveListener(35, _onPlayerRespawnListener); _onPlayerRespawnListener = null; }
+        if (_onGameEndListener != null)
+        { EventCenter.RemoveListener(34, _onGameEndListener); _onGameEndListener = null; }
+        if (_onPlayerOfflineListener != null)
+        { EventCenter.RemoveListener(37, _onPlayerOfflineListener); _onPlayerOfflineListener = null; }
+        if (_onGameStartListener != null)
+        { EventCenter.RemoveListener(16, _onGameStartListener); _onGameStartListener = null; }
+
+        // 清空 Lua 回调引用，防止悬挂
         OnCrystalSpawn = null;
         OnCrystalPickup = null;
         OnPlayerHit = null;
@@ -117,7 +159,7 @@ public static class LuaEventBridge
         OnPlayerOffline = null;
         OnGameStart = null;
 
-        Debug.Log("[LuaEventBridge] 已关闭，所有回调已清空");
+        Debug.Log("[LuaEventBridge] 已关闭，所有 EventCenter 监听器已移除，回调已清空");
     }
 
     #endregion

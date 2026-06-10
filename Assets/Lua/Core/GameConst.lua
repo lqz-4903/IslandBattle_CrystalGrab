@@ -11,6 +11,7 @@ GC.MOVE_FORWARD  = 1   -- W / bit 0
 GC.MOVE_BACKWARD = 2   -- S / bit 1
 GC.MOVE_LEFT     = 4   -- A / bit 2
 GC.MOVE_RIGHT    = 8   -- D / bit 3
+GC.MOVE_ROLL     = 16  -- ★ bit 4：翻滚状态（编码在 MoveDir 中，不修改 proto）
 
 -- ========== 游戏参数（与服务端 GameEventHandler 保持一致）==========
 GC.DEFAULT_HP       = 3       -- 默认生命值

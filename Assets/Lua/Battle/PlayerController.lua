@@ -199,10 +199,12 @@ function PlayerController:_ApplyLocalMovement(dt)
 
     -- ==== 垂直移动（重力 + 跳跃）====
     local vertVelocity
+    local justJumped = false
     if player.isGrounded then
         if InputHandler.jumpPressed and not self._isRolling then
             vertVelocity = GC.JUMP_FORCE
             player.isGrounded = false
+            justJumped = true
         else
             -- 贴地时用较强负速度压住地面，防止起伏地形弹跳
             vertVelocity = -GC.GRAVITY * 0.5
@@ -223,8 +225,12 @@ function PlayerController:_ApplyLocalMovement(dt)
     if not ok then return end
 
     -- 更新着地状态
-    local ok2, grounded = pcall(function() return controller.isGrounded end)
-    if ok2 then player.isGrounded = grounded end
+    -- ★ 刚刚起跳时不立即检测着地，防止首帧位移太小（<stepOffset）
+    --    导致 CharacterController.isGrounded 仍为 true 而取消跳跃
+    if not justJumped then
+        local ok2, grounded = pcall(function() return controller.isGrounded end)
+        if ok2 then player.isGrounded = grounded end
+    end
 
     -- 同步位置
     if player.transform ~= nil then
@@ -439,8 +445,14 @@ function PlayerController:_SubmitHostInput(input)
     local yawRaw   = CS.Fix64.FromFloat(input.cameraYaw).Raw
     local chargeRaw = CS.Fix64.FromFloat(input.chargeTime).Raw
 
+    -- ★ 翻滚编码到 MoveDir 的 bit 4（不修改 proto）
+    local moveDir = input.moveDir
+    if self._isRolling then
+        moveDir = moveDir | GC.MOVE_ROLL
+    end
+
     hostServer:SubmitHostInput(
-        input.moveDir,
+        moveDir,
         input.jump,
         input.attack,
         input.skill,
@@ -462,7 +474,12 @@ function PlayerController:_SubmitClientInput(input)
     local playerInput = CS.GameProto.PlayerInput()
     playerInput.PlayerId = self.playerId
     playerInput.Tick = 0
-    playerInput.MoveDir = input.moveDir
+    -- ★ 翻滚编码到 MoveDir 的 bit 4（不修改 proto）
+    local moveDir = input.moveDir
+    if self._isRolling then
+        moveDir = moveDir | GC.MOVE_ROLL
+    end
+    playerInput.MoveDir = moveDir
     playerInput.Jump = input.jump
     playerInput.Attack = input.attack
     playerInput.Skill = input.skill

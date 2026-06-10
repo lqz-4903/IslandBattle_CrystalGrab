@@ -17,7 +17,6 @@
 -- =============================================
 
 local GC = require("Core.GameConst")
-local Fix64 = require("Fix64")
 
 local InputHandler = {}
 InputHandler.__index = InputHandler
@@ -102,11 +101,22 @@ function InputHandler:Update(dt)
     end
 
     -- 动作按键（攻击/技能用直接鼠标检测，绕过 InputManager 防止 Ctrl 等键盘误触发）
-    self.jumpPressed   = CS.UnityEngine.Input.GetButtonDown(GC.KEY.JUMP)
-    self.attackHeld    = CS.UnityEngine.Input.GetMouseButton(0)     -- 鼠标左键
-    self.skillPressed  = CS.UnityEngine.Input.GetMouseButtonDown(1) -- 鼠标右键
-    self.rollPressed   = CS.UnityEngine.Input.GetKeyDown(GC.KEYCODE.ROLL)
-    self.reloadPressed = CS.UnityEngine.Input.GetKeyDown(GC.KEYCODE.RELOAD)
+    -- ★ GetButtonDown/GetKeyDown 只在按下的那一帧返回 true，下一帧就会被覆盖为 false
+    --    如果 tick（15fps）刚好不在那一帧触发，输入就丢了。所以用粘滞标记：
+    --    Update 只负责拉高（true），GetTickInput 消费后才拉低（false）
+    if CS.UnityEngine.Input.GetButtonDown(GC.KEY.JUMP) then
+        self.jumpPressed = true
+    end
+    self.attackHeld    = CS.UnityEngine.Input.GetMouseButton(0)     -- 鼠标左键（持续按住，不需粘滞）
+    if CS.UnityEngine.Input.GetMouseButtonDown(1) then
+        self.skillPressed = true
+    end
+    if CS.UnityEngine.Input.GetKeyDown(GC.KEYCODE.ROLL) then
+        self.rollPressed = true
+    end
+    if CS.UnityEngine.Input.GetKeyDown(GC.KEYCODE.RELOAD) then
+        self.reloadPressed = true
+    end
 
     -- 蓄力计时
     if self.attackHeld then

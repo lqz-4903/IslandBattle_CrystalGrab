@@ -55,10 +55,11 @@ function GamePanel:BindEvents()
     end
 end
 
--- 初始化血量条（首次进入时调用，不重置血量）
+-- 初始化血量条（首次进入时调用）
+-- ★ InitBloodBar 在 GamePanel:Show() 中调用，早于 NotifyUI，
+--    此处初始化为满血作为占位，真正血量由 PlayerEntity:NotifyUI() 立即覆盖
 function GamePanel:InitBloodBar()
     if not self.bloodInited then
-        self.curHP = self.maxHP
         self.bloodInited = true
     end
     self:UpdateBloodDisplay()

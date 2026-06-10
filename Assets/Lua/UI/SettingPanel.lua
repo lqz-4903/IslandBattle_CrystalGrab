@@ -77,6 +77,11 @@ function SettingPanel:LoadSettings()
 
     local sldDPI = self:GetControl("sldDPI", "Slider")
     if sldDPI ~= nil then
+        -- ★ 修复：Slider 默认范围 0~1，但 DPI 范围是 0~100，必须显式设置
+        --    0~100 范围，默认值 50 刚好在正中间（50% 位置）
+        sldDPI.minValue = 0
+        sldDPI.maxValue = 100
+        sldDPI.wholeNumbers = true   -- DPI 取整数，避免浮点误差
         sldDPI.value = PlayerData.GetMouseDPI()
     end
 end
@@ -137,6 +142,15 @@ function SettingPanel:BindEvents()
             else
                 BeginPanel:Show()
             end
+        end)
+    end
+
+    -- sldDPI 实时预览：拖动滑块时立即生效（不写盘，避免卡顿）
+    local sldDPI = self:GetControl("sldDPI", "Slider")
+    if sldDPI ~= nil then
+        sldDPI.onValueChanged:AddListener(function(value)
+            -- 实时更新 DPI 到内存（InputHandler 每帧读取），但不保存文件
+            PlayerData.SetMouseDPINoSave(value)
         end)
     end
 
