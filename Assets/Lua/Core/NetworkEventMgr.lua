@@ -6,17 +6,20 @@
 --   并转发到对应的 Lua 侧处理器。
 --
 -- 【事件流向】
---   C# EventCenter → LuaEventBridge.OnXxx → 本模块 → PlayerManager / 其他模块
+--   C# EventCenter → LuaEventBridge.OnXxx → 本模块 → PlayerManager / CrystalManager
 -- =============================================
 
 local PlayerManager = require("Core.PlayerManager")
+local CrystalManager = require("Battle.CrystalManager")
 local GC = require("Core.GameConst")
+local Fix64 = require("Fix64")
 
 local NetworkEventMgr = {}
 NetworkEventMgr.__index = NetworkEventMgr
 
 -- ========== 状态 ==========
 NetworkEventMgr.initialized = false
+NetworkEventMgr._canAttack = true       -- ★ 全程可攻击（无阶段限制）
 
 -- ========== 初始化 ==========
 
@@ -70,14 +73,24 @@ function NetworkEventMgr:Init()
         self:_OnPlayerOffline(msg)
     end
 
-    print("[NetworkEventMgr] 所有网络事件已注册")
+    -- ★ 阶段切换（已弃用——全程无阶段限制，服务端不再广播 PhaseSwitch）
+    bridge.OnPhaseSwitch = function()
+        -- 保留接口兼容，不做任何处理
+    end
+
+    -- ★ 死亡掉落
+    bridge.OnCrystalDrop = function(msg)
+        self:_OnCrystalDrop(msg)
+    end
+
+    print("[NetworkEventMgr] 所有网络事件已注册（含水晶+阶段）")
 end
 
 --- 关闭并注销回调
 function NetworkEventMgr:Shutdown()
     if not self.initialized then return end
     self.initialized = false
-
+    self._canAttack = false
     CS.LuaEventBridge.Shutdown()
     print("[NetworkEventMgr] 已关闭")
 end
@@ -90,19 +103,45 @@ end
 --- @param msg GameStart（protobuf）
 function NetworkEventMgr:_OnGameStart(msg)
     print("[NetworkEventMgr] 游戏开始 种子=" .. msg.RandomSeed .. " 时长=" .. msg.GameDuration ..
-          " 帧率=" .. (msg.TickRate or 15))
-    -- PlayerManager 初始化由 Main.lua InitGame() 统一处理，此处不重复操作
+          " 帧率=" .. (msg.TickRate or 30))
+end
+
+--- ★ 阶段切换（已弃用——全程无阶段限制，服务端不再广播 PhaseSwitch）
+--- 该方法不再被调用，保留仅为代码兼容性
+function NetworkEventMgr:_OnPhaseSwitch()
+    -- no-op
+end
+
+--- ★ 死亡掉落
+--- @param msg CrystalDrop（protobuf）：Count, PlayerId, NewScore
+function NetworkEventMgr:_OnCrystalDrop(msg)
+    local dropCount = msg.Count or 0
+    local playerId = msg.PlayerId
+    local newScore = msg.NewScore
+
+    if dropCount <= 0 then return end
+
+    -- ★ 掉落水晶由服务端 SpawnCrystalAt → CrystalSpawn 广播创建
+    --   客户端在 _OnCrystalSpawn 中自动处理，此处只需更新分数
+    local pm = PlayerManager.GetInstance()
+    local player = pm.players[playerId]
+    if player ~= nil then
+        player:SetScore(newScore)
+    end
+
+    print(string.format("[NetworkEventMgr] 玩家%d掉落%d颗水晶 新分数=%d",
+        playerId, dropCount, newScore))
 end
 
 --- 水晶生成
 function NetworkEventMgr:_OnCrystalSpawn(msg)
     local crystalId = msg.CrystalId
-    local posX = msg.PosX
-    local posY = msg.PosY
-    local posZ = msg.PosZ
+    local posXRaw = msg.PosX
+    local posYRaw = msg.PosY
+    local posZRaw = msg.PosZ
 
-    -- TODO: 交由 CrystalManager 在场景中创建水晶 GameObject
-    -- CrystalManager:SpawnCrystal(crystalId, posX, posY, posZ)
+    local cm = CrystalManager.GetInstance()
+    cm:SpawnCrystal(crystalId, posXRaw, posYRaw, posZRaw)
 end
 
 --- 水晶拾取
@@ -111,8 +150,9 @@ function NetworkEventMgr:_OnCrystalPickup(msg)
     local playerId = msg.PlayerId
     local newScore = msg.NewScore
 
-    -- TODO: 交由 CrystalManager 移除水晶 GameObject
-    -- CrystalManager:RemoveCrystal(crystalId)
+    -- 移除水晶
+    local cm = CrystalManager.GetInstance()
+    cm:RemoveCrystal(crystalId)
 
     -- 更新玩家分数
     local pm = PlayerManager.GetInstance()
@@ -125,9 +165,7 @@ function NetworkEventMgr:_OnPlayerHit(msg)
     local victimId   = msg.VictimId
     local droppedCount = msg.DroppedCount
 
-    -- HP 由服务端权威维护，客户端根据事件扣减本地显示
     local pm = PlayerManager.GetInstance()
-    -- 服务端不直接下发 newHp，客户端自行 -1
     pm:OnServerPlayerHit(attackerId, victimId, droppedCount)
 end
 
@@ -158,10 +196,8 @@ function NetworkEventMgr:_OnGameEnd(msg)
 
     print("[NetworkEventMgr] 游戏结束 胜者=" .. winnerName .. " (ID=" .. winnerId .. ")")
 
-    -- GameOverPanel 已在 GameTimerManager 监听 GameEnd 事件后自动弹出
-    -- 这里只需清理本地状态
-    local pm = PlayerManager.GetInstance()
-    -- 不直接 Shutdown，保留数据供 UI 查询
+    -- 清理水晶
+    CrystalManager.GetInstance():Clear()
 end
 
 --- 玩家离线

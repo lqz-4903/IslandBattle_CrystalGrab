@@ -69,12 +69,16 @@ local function InitGame()
         go:AddComponent(typeof(CS.TickExecutor))
         -- 初始化为客户端模式
         local te = go:GetComponent(typeof(CS.TickExecutor))
-        te:Init(false, gameData.tickRate or 15)
+        te:Init(false, gameData.tickRate or 30)
         print("[Main] 客户端 TickExecutor 已创建")
     end
 
-    -- 3. 初始化网络事件监听（水晶、受击、坠落等）
+    -- 3. 初始化网络事件监听（水晶、受击、坠落、阶段切换等）
     NetworkEventMgr:Init()
+
+    -- 3.5 ★ 初始化水晶管理器（必须在 NetworkEventMgr 之后，因为 NetworkEventMgr 会触发水晶生成事件）
+    local CrystalManager = require("Battle.CrystalManager")
+    CrystalManager.GetInstance():Init()
 
     -- 4. 初始化玩家管理器 + 注册 TickExecutor 回调
     local pm = PlayerManager.GetInstance()

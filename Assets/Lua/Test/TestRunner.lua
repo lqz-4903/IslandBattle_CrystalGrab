@@ -37,6 +37,15 @@ local groups = {
     { name = "V-双路径一致性",  mod = "Test.GroupV_DualPath" },
     { name = "W-输入与移动分离", mod = "Test.GroupW_InputSep" },
     { name = "X-重构回归",      mod = "Test.GroupX_RefactorRegression" },
+    { name = "Y-步长精确性",    mod = "Test.GroupY_StepLength" },
+    { name = "Z-权威位置全链路", mod = "Test.GroupZ_AuthServer" },
+    { name = "Y2-步长直接对比",  mod = "Test.GroupY2_CompStep" },
+    { name = "DIAG-Move原始诊断", mod = "Test.GroupDiag_MoveDebug" },
+    -- ★ 水晶系统（方案A：纯逻辑测试）
+    { name = "Z1-水晶核心数学",  mod = "Test.GroupZ1_CrystalMath" },
+    { name = "Z2-阶段状态机",    mod = "Test.GroupZ2_PhaseLogic" },
+    { name = "Z3-水晶边界异常",  mod = "Test.GroupZ3_CrystalEdge" },
+    { name = "Z4-水晶集成场景",  mod = "Test.GroupZ4_CrystalIntegration" },
 }
 
 local TestRunner = {}
@@ -46,10 +55,12 @@ function TestRunner.RunAll()
     TF.reset()
     print("\n╔══════════════════════════════════════╗")
     print("║  帧同步确定性测试 — 开始运行        ║")
-    print("║  共 " .. #groups .. " 组，166+ 条用例            ║")
+    print("║  共 " .. #groups .. " 组测试                     ║")
     print("╚══════════════════════════════════════╝")
 
     for _, g in ipairs(groups) do
+        -- ★ 清除 XLua require 缓存，确保每次运行加载最新代码
+        package.loaded[g.mod] = nil
         local ok, mod = pcall(require, g.mod)
         if ok and mod and mod.run then
             local runOk, runErr = pcall(mod.run)
@@ -70,6 +81,7 @@ function TestRunner.RunGroup(groupName)
     TF.reset()
     for _, g in ipairs(groups) do
         if g.name:sub(1, 1) == groupName then
+            package.loaded[g.mod] = nil
             local ok, mod = pcall(require, g.mod)
             if ok and mod and mod.run then
                 pcall(mod.run)

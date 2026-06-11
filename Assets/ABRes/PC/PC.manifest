@@ -1,5 +1,5 @@
 ManifestFileVersion: 0
-CRC: 1490103055
+CRC: 2389900145
 AssetBundleManifest:
   AssetBundleInfos:
     Info_0:
@@ -10,4 +10,7 @@ AssetBundleManifest:
       Dependencies: {}
     Info_2:
       Name: player
+      Dependencies: {}
+    Info_3:
+      Name: crystal
       Dependencies: {}

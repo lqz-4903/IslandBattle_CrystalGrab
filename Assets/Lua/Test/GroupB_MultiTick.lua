@@ -6,7 +6,7 @@ local TF = require("Test.TestFramework")
 local TE = require("Test.TestEnv")
 local GC = require("Core.GameConst")
 
-local WALK_PER_TICK = 5 / 15  -- ≈ 0.3333m
+local WALK_PER_TICK = GC.MOVE_SPEED / GC.TICK_RATE
 
 local function run()
     TF.group("B — 多 tick 累积一致性")

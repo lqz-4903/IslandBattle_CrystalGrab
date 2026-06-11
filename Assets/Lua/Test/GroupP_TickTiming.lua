@@ -32,11 +32,11 @@ local function run()
     TF.assertFalse(emptyInput.Jump, "P2-空输入Jump=false")
 
     -- ===== P3: TickInterval 配置验证 =====
-    local expectedInterval = 1 / GC.TICK_RATE  -- 1/15 ≈ 0.06667
-    TF.assertEqual(GC.TICK_INTERVAL, expectedInterval, TF.TIGHT, "P3-TICK_INTERVAL=1/15")
+    local expectedInterval = 1 / GC.TICK_RATE
+    TF.assertEqual(GC.TICK_INTERVAL, expectedInterval, TF.TIGHT, "P3-TICK_INTERVAL=1/" .. GC.TICK_RATE)
 
     -- ===== P4: 帧间隔容忍 =====
-    local targetMs = GC.TICK_INTERVAL * 1000  -- ≈ 66.67ms
+    local targetMs = GC.TICK_INTERVAL * 1000
     local lower = targetMs * 0.8   -- ≈ 53ms
     local upper = targetMs * 1.2   -- ≈ 80ms
     TF.assertInRange(targetMs, lower, upper, "P4-帧间隔≈67ms±20%")

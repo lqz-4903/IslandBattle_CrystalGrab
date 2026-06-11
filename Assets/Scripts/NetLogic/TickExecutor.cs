@@ -43,8 +43,8 @@ public class TickExecutor : MonoBehaviour
 
     #region =============== 配置 ===============
 
-    // 默认逻辑帧率（每秒15帧）
-    private const int DefaultTickRate = 15;
+    // 默认逻辑帧率（每秒30帧）
+    private const int DefaultTickRate = 30;
 
     // 追赶模式下每帧最多执行的帧数 （防止一帧内执行过多导致卡顿）
     private const int MaxCatchUpPreTick = 5;
@@ -307,4 +307,4 @@ public class TickExecutor : MonoBehaviour
     #endregion
 
 }
-// 211 - 233 Todo
+// Done

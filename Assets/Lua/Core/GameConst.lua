@@ -14,25 +14,32 @@ GC.MOVE_RIGHT    = 8   -- D / bit 3
 GC.MOVE_ROLL     = 16  -- ★ bit 4：翻滚状态（编码在 MoveDir 中，不修改 proto）
 
 -- ========== 游戏参数（与服务端 GameEventHandler 保持一致）==========
-GC.DEFAULT_HP       = 3       -- 默认生命值
-GC.DEFAULT_WIN_SCORE = 10     -- 默认胜利分数
-GC.CRYSTAL_INTERVAL  = 5      -- 水晶生成间隔（秒）
-GC.MAX_CRYSTALS      = 5      -- 最大同时存在水晶数
-GC.DEFAULT_GAME_DURATION = 120 -- 默认游戏时长（秒）
+GC.DEFAULT_HP         = 3       -- 默认生命值
+GC.CRYSTAL_SCORE_VALUE = 6     -- 每颗水晶分数
+GC.ZONE_SPAWN_INTERVAL = 1.5   -- 每区域水晶生成间隔（秒）
+GC.SPAWN_ZONE_COUNT    = 5     -- 生成区域数
+GC.DEFAULT_GAME_DURATION = 127 -- 默认游戏时长（秒）
+GC.PICKUP_RANGE        = 0.8   -- 水晶拾取距离（米）
+-- ★ 不再设胜利分数（时间结束按最高分判定）
+-- ★ 不再设水晶同时在场上限（无限制）
 
 -- ========== 客户端模拟参数 ==========
-GC.TICK_RATE       = 15       -- 逻辑帧率（与服务端 TickSyncHandler 一致）
-GC.TICK_INTERVAL   = 1 / 15   -- 每帧间隔（秒）
+GC.TICK_RATE       = 30       -- 逻辑帧率（与服务端 TickSyncHandler 一致）
+GC.TICK_INTERVAL   = 1 / 30   -- 每帧间隔（秒）
 GC.MOVE_SPEED      = 5        -- 玩家移动速度（米/秒）
 GC.JUMP_FORCE      = 8        -- 跳跃初速度
 GC.GRAVITY         = 20       -- 重力加速度
 GC.PHYSICS_SUBSTEPS = 8        -- 远程玩家每 tick 物理子步数（匹配 120fps 碰撞精度，缩小主机端远程玩家与客户端自视的差异）
 GC.MOUSE_SENSITIVITY = 0.003 -- 鼠标灵敏度（每像素旋转弧度，0.003≈0.17°/像素）
 
--- ========== 网络插值参数（消除 15fps tick → 60fps 渲染的卡顿）==========
-GC.INTERP_INTERVAL    = 1 / 15   -- 插值时间窗口（与 TICK_RATE 一致）
+-- ========== 网络插值参数（消除 30fps tick → 60fps 渲染的卡顿）==========
+GC.INTERP_INTERVAL    = 1 / 30   -- 插值时间窗口（与 TICK_RATE 一致）
 GC.INTERP_MAX_EXTRAP  = 2        -- 最大外推 tick 数（tick 延迟时短暂外推）
 GC.INTERP_ROT_SPEED   = 720      -- 旋转插值速度（度/秒），使用 RotateTowards
+
+-- ========== 客户端预测-校正（Reconciliation）==========
+GC.RECONCILE_THRESHOLD    = 0.02    -- 本地玩家位置校正阈值（米），超过此值触发回滚+重放
+GC.INPUT_BUFFER_MAX       = 180     -- 输入缓冲区最大容量（约 6 秒 @ 30fps）
 
 -- ========== 网络消息 ID ==========
 GC.MSG_ID = {

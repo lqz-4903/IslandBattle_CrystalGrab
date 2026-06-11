@@ -65,10 +65,11 @@ function PlayerManager:Init()
         self:OnFrameEnd(tick)
     end
 
-    -- ★ 注册 60fps 远程玩家插值（消除 15fps tick 的卡顿）
+    -- ★ 注册 LateUpdate 渲染层（在所有 Update/TickExecutor 物理回退之后执行）
+    --   确保插值读到正确的 prevPos/targetPos，不被物理回退覆盖
     if self._interpUpdateId == nil then
-        self._interpUpdateId = RegisterUpdate(function(dt)
-            self:_InterpolateRemotePlayers(dt)
+        self._interpUpdateId = RegisterLateUpdate(function(dt)
+            self:_InterpolateAllPlayers(dt)
         end)
     end
 
@@ -90,7 +91,7 @@ function PlayerManager:Shutdown()
     TickExecutor.OnAfterTickExecuted = nil
 
     if self._interpUpdateId ~= nil then
-        UnregisterUpdate(self._interpUpdateId)
+        UnregisterLateUpdate(self._interpUpdateId)
         self._interpUpdateId = nil
     end
 
@@ -226,6 +227,12 @@ function PlayerManager:SpawnAllPlayers(playerList, localPlayerId)
         player:SetPosition(spawnPos.x, spawnPos.y, spawnPos.z)
         player:SetYaw(spawnYaw)
 
+        -- ★ 通知服务端出生点（死亡重生用）
+        local hostServer = CS.HostServer.Instance
+        if hostServer ~= nil then
+            hostServer:SetPlayerBirthPos(playerId, pos.x, pos.y, pos.z)
+        end
+
         self.players[playerId] = player
 
         local tag = isLocal and "[本地]" or "[远程]"
@@ -308,6 +315,8 @@ function PlayerManager:SpawnLocalOnly(playerId, playerName)
         cc.height = 1.8
         cc.radius = 0.4
         cc.center = CS.UnityEngine.Vector3(0, 0.9, 0)
+        cc.stepOffset = 0.3
+        cc.slopeLimit = 45
     end
     player.controller = cc
     player:SetPosition(Fix64.fromFloat(pos.x), Fix64.fromFloat(pos.y), Fix64.fromFloat(pos.z))
@@ -370,46 +379,56 @@ function PlayerManager:ApplyFrameInput(input)
 
     player:ApplyInput(input)
 
-    -- ★ 提取服务端权威位置（仅远程玩家，本地玩家不设置）
+    -- ★ 提取服务端权威位置（所有玩家 —— 含本地玩家的自校正）
     --   ResultPosX/Y/Z 由主机 TickSyncHandler.FinalizeTick 填入上一 tick 的物理终点
     --   客户端在下一帧 _ApplyServerPositionCorrection 中消费，校正漂移后丢弃
-    if playerId ~= self.localPlayerId then
-        local rpx = input.ResultPosX
-        local rpy = input.ResultPosY
-        local rpz = input.ResultPosZ
-        -- 只有服务端确实设置了位置时才覆盖（全零 = 未设置或无漂移数据）
-        if rpx ~= 0 or rpy ~= 0 or rpz ~= 0 then
-            player._serverAuthPos = {
-                x = Fix64.new(rpx),
-                y = Fix64.new(rpy),
-                z = Fix64.new(rpz),
-            }
-        end
+    --   ★ 本地玩家也需要校正：60fps _ApplyLocalMovement 的 PhysX 子步与主机 30fps
+    --     确定性物理的 8 子步结果不同，累积漂移需服务端权威兜底
+    local rpx = input.ResultPosX
+    local rpy = input.ResultPosY
+    local rpz = input.ResultPosZ
+    if rpx ~= 0 or rpy ~= 0 or rpz ~= 0 then
+        player._serverAuthPos = {
+            x = Fix64.new(rpx),
+            y = Fix64.new(rpy),
+            z = Fix64.new(rpz),
+        }
+    end
+
+    -- ★ 客户端预测-校正：记录服务端回传的客户端 tick 编号
+    --   0 = 服务端超时生成的空输入（stub），>0 = 客户端实际 tick
+    --   用于判断哪些输入已被服务端物理消费，哪些需要重放
+    if player.playerId == self.localPlayerId then
+        player._serverEchoedTick = input.Tick
     end
 end
 
 function PlayerManager:OnFrameEnd(tick)
     self.frameCount = self.frameCount + 1
 
-    -- ★ 对所有玩家执行确定性移动（包括主机本地玩家）
-    --   统一路径：所有玩家的位置由同一物理函数产出，消除双路径不一致导致的幻影漂移
-    local tickDt = Fix64.fromFloat(GC.TICK_INTERVAL)
-    for _, player in pairs(self.players) do
-        if player.isAlive and player.controller ~= nil and not IsNull(player.controller) then
-            self:_ApplyDeterministicMovement(player, tickDt)
-        end
-    end
-
-    -- ★ 客户端：应用服务端权威位置校正（硬回滚漂移）
-    --   OnFrameEnd 中在确定性移动之后、捕获之前调用
     local isHost = (CS.HostServer.Instance ~= nil and CS.HostServer.Instance.IsGameStarted)
+
+    -- ★ 客户端：先应用服务端权威位置校正，再执行物理
+    --   校正 → 物理从正确位置出发 → 位移准确 → bug 2/3 一并解决
     if not isHost then
         self:_ApplyServerPositionCorrection(tick.Tick)
     end
 
+    -- ★ 对所有玩家执行确定性移动（统一 30fps 物理）
+    --   本地玩家 + 远程玩家：均由 _ApplyDeterministicMovement 驱动
+    --   渲染由 _InterpolateAllPlayers 60fps 插值平滑
+    local tickDt = Fix64.fromFloat(GC.TICK_INTERVAL)
+    for _, player in pairs(self.players) do
+        if not player.isAlive then goto continue_physics end
+        if player.controller == nil or IsNull(player.controller) then goto continue_physics end
+
+        self:_ApplyDeterministicMovement(player, tickDt)
+        ::continue_physics::
+    end
+
     -- 主机端 — 捕获所有玩家的物理结果位置，供下一 tick 附带发送
     -- ★ 所有玩家统一从 _interpState.targetPos 读取（不再区分本地/远程）
-    if CS.HostServer.Instance ~= nil and CS.HostServer.Instance.IsGameStarted then
+    if isHost then
         self:_CaptureAuthPositions()
     end
 
@@ -424,7 +443,7 @@ PlayerManager._interpUpdateId = nil
 -- =============================================
 -- 主机端权威位置捕获
 -- =============================================
-_capDebugCounter = 0   -- 主机端：捕获日志计数
+PlayerManager._capDebugCounter = 0   -- 主机端：捕获日志计数
 
 --- 主机端：捕获所有玩家在 tick 执行后的物理位置。
 --- 位置经 Fix64.Raw 转换后提交给 C# TickSyncHandler，附加到下一 tick 的 InputTick 中。
@@ -458,21 +477,23 @@ function PlayerManager:_CaptureAuthPositions()
         local yRaw = CS.Fix64.FromFloat(posY).Raw
         local zRaw = CS.Fix64.FromFloat(posZ).Raw
         hostServer:SubmitAuthPosition(player.playerId, xRaw, yRaw, zRaw)
+        -- ★ 同时报告位置给 GameEventHandler（死亡掉落定位用）
+        hostServer:ReportPlayerPosition(player.playerId, posX, posY, posZ)
         captureCount = captureCount + 1
 
         ::continue_cap::
     end
 
     -- 调试：每秒（75 tick）打印一次捕获统计
-    _capDebugCounter = _capDebugCounter + 1
-    if _capDebugCounter % 75 == 0 and captureCount > 0 then
+    self._capDebugCounter = self._capDebugCounter + 1
+    if self._capDebugCounter % 75 == 0 and captureCount > 0 then
         -- 打印第一个玩家的位置作为样本
         local samplePlayer = nil
         for _, p in pairs(self.players) do samplePlayer = p; break end
         if samplePlayer ~= nil and samplePlayer.transform ~= nil then
             local sp = samplePlayer.transform.position
             print(string.format("[PlayerManager] 捕获#%d 玩家数=%d 样本[玩家%d]=(%.2f,%.2f,%.2f)",
-                _capDebugCounter, captureCount,
+                self._capDebugCounter, captureCount,
                 samplePlayer.playerId, sp.x, sp.y, sp.z))
         end
     end
@@ -481,14 +502,18 @@ end
 -- =============================================
 -- 客户端权威位置校正（硬回滚）
 -- =============================================
---- 客户端：校正因 PhysX 非确定性产生的远程玩家位置漂移。
---- 服务端在每个 InputTick 中附带上一 tick 的权威物理终点（ResultPosX/Y/Z），
---- 客户端 ApplyFrameInput 将其写入 _serverAuthPos。
---- 本函数在 OnFrameEnd 中调用，比较 prevPos 与 serverPos：
----   漂移 ≤ 1cm → 不校正
----   漂移 > 1cm → prevPos = serverPos, targetPos = serverPos + 位移增量
+--- ★ 在 _ApplyDeterministicMovement 之前调用，确保物理从正确位置出发。
+---
+--- 两种校正路径：
+---   A) 远程玩家（有 _interpState）：校正 st.targetPos/st.prevPos，
+---      后续 _ApplyDeterministicMovement 从校正位置出发执行物理。
+---   B) 客户端本地玩家（无 _interpState，60fps 预测驱动）：
+---      直接校正 transform.position，下一帧 _ApplyLocalMovement 从校正位置继续。
+---
 --- @param tick int — 当前 tick
 function PlayerManager:_ApplyServerPositionCorrection(tick)
+    -- 调用方已确保 not isHost，此处保留用于路径 B 的防护判断
+    local isHost = false
     for _, player in pairs(self.players) do
         local authPos = player._serverAuthPos
         if authPos == nil then goto continue_corr end
@@ -496,26 +521,79 @@ function PlayerManager:_ApplyServerPositionCorrection(tick)
         -- ★ 一次性消费：校正后清除，防止重复校正
         player._serverAuthPos = nil
 
-        local st = player._interpState
-        if st == nil or st.prevPos == nil or st.targetPos == nil then
-            goto continue_corr
-        end
-
-        -- Fix64.Raw → float → Unity Vector3
         local serverPos = CS.UnityEngine.Vector3(
             Fix64.toFloat(authPos.x),
             Fix64.toFloat(authPos.y),
             Fix64.toFloat(authPos.z)
         )
 
-        local drift = (st.prevPos - serverPos).magnitude
-        local CORRECTION_THRESHOLD = 0.01  -- 1cm：漂移小于此值不校正
+        local st = player._interpState
 
-        if drift > CORRECTION_THRESHOLD then
-            -- 保留本 tick 的位移增量，叠加到服务端权威位置上
-            local displacement = st.targetPos - st.prevPos
-            st.prevPos = serverPos
-            st.targetPos = serverPos + displacement
+        if st ~= nil and st.targetPos ~= nil then
+            -- ==== 路径 A：远程玩家（有插值状态）====
+            -- 比较客户端的 tick N-1 物理结果（存于 targetPos）与服务端权威位置
+            local drift = (st.targetPos - serverPos).magnitude
+            local CORRECTION_THRESHOLD = 0.01  -- 1cm
+
+            if drift > CORRECTION_THRESHOLD then
+                st.targetPos = serverPos
+                st.prevPos   = serverPos   -- 链条一致：下个 tick 的 prevPos 也正确
+                st.elapsed   = 0           -- 重置插值计时器
+
+                if player.transform ~= nil then
+                    player.transform.position = serverPos
+                end
+
+                if tick % 75 == 0 then
+                    print(string.format(
+                        "[PlayerManager] 校正[远程] 玩家%d drift=%.3fm → 已同步到服务端位置",
+                        player.playerId, drift))
+                end
+            end
+
+        elseif player.transform ~= nil and not isHost then
+            -- ==== 路径 B：客户端本地玩家 — 回滚 + 输入重放（Reconciliation）====
+            -- 1. 确认服务端已消费的客户端输入
+            -- 2. 回滚到服务端权威位置
+            -- 3. 重放未确认的输入，从权威位置出发重新预测
+            local curPos = player.transform.position
+            local drift = (curPos - serverPos).magnitude
+            local threshold = GC.RECONCILE_THRESHOLD or 0.02
+
+            if drift > threshold then
+                -- ★ 确认服务端已消费的客户端输入
+                --   服务端回传的客户端 tick T 意味着：tick < T 的输入已被服务端物理执行
+                --   （T 本身正在被当前 server tick 消费，结果尚未反映在此次权威位置中）
+                local echoTick = player._serverEchoedTick or 0
+                local PC = require("Battle.PlayerController")
+                if echoTick > 0 then
+                    PC:AcknowledgeUpTo(echoTick - 1)
+                end
+
+                -- ★ 回滚到服务端权威位置
+                player.transform.position = serverPos
+                player.position = Vec3.new(
+                    Fix64.fromFloat(serverPos.x),
+                    Fix64.fromFloat(serverPos.y),
+                    Fix64.fromFloat(serverPos.z)
+                )
+
+                -- ★ 回滚后同步着地状态（防止第一帧重放用错 isGrounded）
+                if player.controller ~= nil and not IsNull(player.controller) then
+                    local ok, grounded = pcall(function() return player.controller.isGrounded end)
+                    if ok then player.isGrounded = grounded end
+                end
+
+                -- ★ 重放未确认的输入，从服务端位置出发重新预测
+                self:_ReconcileReplayLocalInputs(player, PC)
+
+                if tick % 75 == 0 then
+                    local unackedCount = #PC:GetUnackedInputs()
+                    print(string.format(
+                        "[PlayerManager] 校正[本地] 玩家%d drift=%.3fm → 回滚+重放%d帧 (echoTick=%d)",
+                        player.playerId, drift, unackedCount, echoTick))
+                end
+            end
         end
 
         ::continue_corr::
@@ -523,7 +601,122 @@ function PlayerManager:_ApplyServerPositionCorrection(tick)
 end
 
 -- =============================================
--- 远程玩家插值系统（消除 15fps tick → 60fps 渲染的卡顿）
+-- 客户端本地玩家预测-校正：输入重放
+-- =============================================
+--- 从服务端权威位置出发，重放所有未确认的输入，重新预测当前位置。
+--- 原理：服务端权威位置 = "正确的过去"，未确认输入 = "客户端已发送但服务端尚未处理的未来"，
+---       重放这些输入 = 从正确的过去推导出最准确的当前预测位置。
+--- @param player PlayerEntity — 本地玩家
+--- @param pc table — PlayerController 模块引用
+function PlayerManager:_ReconcileReplayLocalInputs(player, pc)
+    local unackedInputs = pc:GetUnackedInputs()
+    if #unackedInputs == 0 then return end
+
+    local tickDt = Fix64.fromFloat(GC.TICK_INTERVAL)
+
+    -- 逐帧重放未确认的输入
+    for _, entry in ipairs(unackedInputs) do
+        local data = entry.data
+        player.moveDir   = data.moveDir
+        player.yaw       = Fix64.fromFloat(data.yaw)
+        player.isJumping = data.jump or false
+
+        self:_ReplayDeterministicStep(player, tickDt)
+    end
+
+    -- 同步最终位置到 Lua position 记录
+    if player.transform ~= nil and not IsNull(player.transform) then
+        local pos = player.transform.position
+        player.position = Vec3.new(
+            Fix64.fromFloat(pos.x),
+            Fix64.fromFloat(pos.y),
+            Fix64.fromFloat(pos.z)
+        )
+
+        -- ★ 修复：确保 _interpState 已初始化，防止本地玩家校正后插值状态缺失
+        self:_InitInterpState(player)
+        player._interpState.targetPos = player.transform.position
+        player._interpState.prevPos   = player.transform.position
+        player._interpState.elapsed   = 0
+    end
+end
+
+--- 回滚重放专用的单帧确定性物理。
+--- 与 _ApplyDeterministicMovement 相同的物理逻辑，但不管理插值状态、不回退 Transform ——
+--- 因为本地玩家由 60fps _ApplyLocalMovement 驱动渲染。
+--- @param player PlayerEntity
+--- @param dt Fix64 — tick 时间间隔
+function PlayerManager:_ReplayDeterministicStep(player, dt)
+    local controller = player.controller
+    if controller == nil or IsNull(controller) then return end
+
+    local dtFloat = Fix64.toFloat(dt)
+    local moveDir = player.moveDir
+    local yawFloat = Fix64.toFloat(player.yaw)
+
+    -- 水平移动
+    local hVelocity = CS.UnityEngine.Vector3.zero
+    local dirMask = moveDir & 0x0F
+    local isRolling = (moveDir & GC.MOVE_ROLL) ~= 0
+
+    if dirMask ~= GC.MOVE_NONE then
+        local forward = CS.UnityEngine.Vector3(math.sin(yawFloat), 0, math.cos(yawFloat))
+        local right   = CS.UnityEngine.Vector3(math.cos(yawFloat), 0, -math.sin(yawFloat))
+        local dir = CS.UnityEngine.Vector3.zero
+        if dirMask & GC.MOVE_FORWARD ~= 0 then dir = dir + forward end
+        if dirMask & GC.MOVE_BACKWARD ~= 0 then dir = dir - forward end
+        if dirMask & GC.MOVE_RIGHT ~= 0 then dir = dir + right end
+        if dirMask & GC.MOVE_LEFT ~= 0 then dir = dir - right end
+        if dir.magnitude > 1 then dir = dir.normalized end
+        local speed = isRolling and 12 or GC.MOVE_SPEED
+        hVelocity = dir * speed
+    end
+
+    -- 垂直移动
+    local vertVelocity
+    local justJumped = false
+    if player.isGrounded then
+        if player.isJumping then
+            vertVelocity = GC.JUMP_FORCE
+            player.isGrounded = false
+            justJumped = true
+            player._jumpInitiated = true
+        else
+            vertVelocity = 0
+        end
+    else
+        vertVelocity = Fix64.toFloat(player.velocity.y) - GC.GRAVITY * dtFloat
+    end
+
+    -- 子步物理
+    local subSteps = GC.PHYSICS_SUBSTEPS or 4
+    local subDt = dtFloat / subSteps
+    local subDisp = CS.UnityEngine.Vector3(
+        hVelocity.x * subDt,
+        vertVelocity * subDt,
+        hVelocity.z * subDt
+    )
+    for _ = 1, subSteps do
+        local ok = pcall(function() controller:Move(subDisp) end)
+        if not ok then break end
+    end
+
+    -- 更新着地状态（刚起跳时不检测，防止首帧取消跳跃）
+    if not justJumped then
+        local ok, grounded = pcall(function() return controller.isGrounded end)
+        if ok then player.isGrounded = grounded end
+    end
+
+    -- 更新速度
+    player.velocity = Vec3.new(
+        Fix64.fromFloat(hVelocity.x),
+        Fix64.fromFloat(vertVelocity),
+        Fix64.fromFloat(hVelocity.z)
+    )
+end
+
+-- =============================================
+-- 远程玩家插值系统（消除 30fps tick → 60fps 渲染的卡顿）
 -- =============================================
 -- 【插值原理】
 --   _ApplyDeterministicMovement 每 tick（1/15s）执行物理移动
@@ -556,17 +749,13 @@ function PlayerManager:_InitInterpState(player)
     end
 end
 
---- 每帧插值玩家位置（60fps 平滑），消除 15fps tick 的卡顿感
---- ★ 统一路径后：主机所有玩家都走插值（本地不再做 60fps 预测）
----   客户端本地玩家仍走 60fps 预测，仅远程玩家走插值
+--- 每帧插值所有玩家位置（60fps 平滑），消除 30fps tick → 60fps 渲染的卡顿感
+--- ★ 统一 30fps 物理后，本地玩家也走此插值路径（与远程玩家完全一致）
+---   本地玩家旋转由 PlayerController._UpdateCamera 直接控制，插值系统跳过旋转
 --- @param dt number — Unity Time.deltaTime（秒）
-function PlayerManager:_InterpolateRemotePlayers(dt)
-    -- 主机模式：本地玩家的 transform 由插值器驱动（不再走 60fps 预测）
-    local isHost = (CS.HostServer.Instance ~= nil and CS.HostServer.Instance.IsGameStarted)
+function PlayerManager:_InterpolateAllPlayers(dt)
     for _, player in pairs(self.players) do
-        -- 客户端本地玩家走 60fps 预测，跳过插值；主机所有玩家都走插值
-        local skipInterp = (not isHost and player.playerId == self.localPlayerId)
-        if not skipInterp and player.isAlive then
+        if player.isAlive then
             self:_InitInterpState(player)
             local st = player._interpState
 
@@ -574,42 +763,33 @@ function PlayerManager:_InterpolateRemotePlayers(dt)
                 -- ==== 1. 累积插值时间 ====
                 st.elapsed = st.elapsed + dt
 
-                -- ==== 2. 时间归一化插值因子 ====
-                local t = st.elapsed / st.interval
+                -- ★ 本地玩家：跳过位置插值 — transform 已由 _ApplyDeterministicMovement
+                --   保持在 targetPos（最新物理位置），无滞后，摄像机响应跟手
+                if player.playerId ~= self.localPlayerId then
+                    -- ==== 2. 时间归一化插值因子（钳制到 [0,1]，取消外推）====
+                    --     外推会在 tick 迟到时产生位置偏移，下一 tick 到达时
+                    --     因 elapsed 重置而跳回 prevPos，造成画面抖动。
+                    --     钳制后 tick 短暂迟到时停在 targetPos，无抖动。
+                    local t = math.min(st.elapsed / st.interval, 1.0)
 
-                if t <= 1.0 then
-                    -- ==== 3a. 正常插值：smoothstep 缓动 ====
-                    --      t²(3-2t) 在 t=0 和 t=1 处导数为 0，消除方向突变时的抖动
+                    -- ==== 3. smoothstep 缓动 ====
+                    --      t²(3-2t) 在 t=0 和 t=1 处导数为 0，消除方向突变
                     local tSmooth = t * t * (3 - 2 * t)
                     local newPos = CS.UnityEngine.Vector3.Lerp(st.prevPos, st.targetPos, tSmooth)
                     player.transform.position = newPos
-                else
-                    -- ==== 3b. 插值结束但新 tick 未到：速度外推 ====
-                    --      tick 可能因网络波动延迟，短暂外推避免僵住
-                    local extraTime = st.elapsed - st.interval
-                    local maxExtrap = st.interval * GC.INTERP_MAX_EXTRAP
-                    if extraTime <= maxExtrap and st.prevVelocity ~= nil then
-                        -- 速度衰减外推（越久越慢，避免飞出去）
-                        local decay = 1.0 - (extraTime / maxExtrap) * 0.7
-                        local v = st.prevVelocity * decay
-                        local extrapPos = st.targetPos + v * extraTime
-                        -- 在外推位置和目标位置之间做混合，防止突变
-                        local blend = extraTime / maxExtrap
-                        extrapPos = CS.UnityEngine.Vector3.Lerp(st.targetPos, extrapPos, 1.0 - blend * 0.5)
-                        player.transform.position = extrapPos
-                    end
-                    -- 超过最大外推时间 → 保持目标位置，等待下一个 tick
                 end
 
                 -- ==== 4. 旋转插值：恒定角速度 RotateTowards ====
-                --      避免 15fps 瞬时切向造成的旋转跳帧
+                --      本地玩家旋转由摄像机直接控制（60fps 即时响应），跳过插值
                 if st.prevYaw ~= nil and st.targetYaw ~= nil then
-                    local maxDegrees = GC.INTERP_ROT_SPEED * dt
-                    local curRot = player.transform.rotation
-                    local targetRot = CS.UnityEngine.Quaternion.Euler(0, st.targetYaw, 0)
-                    player.transform.rotation = CS.UnityEngine.Quaternion.RotateTowards(
-                        curRot, targetRot, maxDegrees
-                    )
+                    if player.playerId ~= self.localPlayerId then
+                        local maxDegrees = GC.INTERP_ROT_SPEED * dt
+                        local curRot = player.transform.rotation
+                        local targetRot = CS.UnityEngine.Quaternion.Euler(0, st.targetYaw, 0)
+                        player.transform.rotation = CS.UnityEngine.Quaternion.RotateTowards(
+                            curRot, targetRot, maxDegrees
+                        )
+                    end
                 end
             end
 
@@ -619,12 +799,13 @@ function PlayerManager:_InterpolateRemotePlayers(dt)
     end
 end
 
---- 确定性移动 + 动画同步（用于远程玩家）
+--- 确定性移动 + 动画同步（本地+远程玩家统一入口）
 --- ★ 插值状态管理：
 ---   1. 上一 tick 的 targetPos → 本 tick 的 prevPos（保证位置链连续）
 ---   2. controller:Move() 执行后保存新位置 → 本 tick 的 targetPos
----   3. 将 Transform 回退到 prevPos（渲染滞后 1 tick，由插值器 60fps 驱动前进）
----   4. 保存 yaw / velocity 供旋转插值和外推使用
+---   3. 远程玩家：Transform 回退到 prevPos（渲染滞后 1 tick，由插值器 60fps 驱动前进）
+---      本地玩家：保持在 targetPos（最新物理位置），摄像机跟随即时位置，无滞后
+---   4. 保存 yaw / velocity 供旋转插值使用
 function PlayerManager:_ApplyDeterministicMovement(player, dt)
     local controller = player.controller
     local dtFloat = Fix64.toFloat(dt)
@@ -735,17 +916,20 @@ function PlayerManager:_ApplyDeterministicMovement(player, dt)
         st.hasTarget = true
         st.elapsed = 0  -- ★ 重置插值计时器
 
-        -- ★ 将 Transform 回退到插值起点（渲染滞后 1 tick）
-        --   60fps 插值器会在接下来 1/15s 内从 prevPos 平滑驱动到 targetPos
-        if st.prevPos ~= nil then
-            player.transform.position = st.prevPos
-            player.transform.rotation = CS.UnityEngine.Quaternion.Euler(0, st.prevYaw or 0, 0)
+        -- ★ 本地玩家：保持在 targetPos（最新物理位置），不倒退
+        --   跳过插值延迟，摄像机跟随即时位置，输入响应更跟手
+        --   远程玩家：倒退到 prevPos，60fps 插值器在接下来 1/30s 内平滑驱动到 targetPos
+        if player.playerId ~= self.localPlayerId then
+            if st.prevPos ~= nil then
+                player.transform.position = st.prevPos
+                player.transform.rotation = CS.UnityEngine.Quaternion.Euler(0, st.prevYaw or 0, 0)
+            end
         end
     end
 end
 
 --- 更新远程玩家的动画参数（每帧 60fps 调用，由 _InterpolateRemotePlayers 驱动）
---- ★ 动画 float 参数做帧间平滑，消除 15fps → 60fps 的数值跳变
+--- ★ 动画 float 参数做帧间平滑，消除 30fps → 60fps 的数值跳变
 function PlayerManager:_UpdateRemoteAnimator(player, dt)
     if player._animatorCached == nil and player.gameObject ~= nil and not IsNull(player.gameObject) then
         player._animatorCached = player.gameObject:GetComponentInChildren(typeof(CS.UnityEngine.Animator))
@@ -756,14 +940,14 @@ function PlayerManager:_UpdateRemoteAnimator(player, dt)
         return
     end
 
-    -- 目标动画参数（由 tick 驱动，15fps 更新）
+    -- 目标动画参数（由 tick 驱动，30fps 更新）
     local targetHSpeed = (player._hSpeed or 0) / GC.MOVE_SPEED
     local targetVSpeed = 0
     if not player.isGrounded then
         targetVSpeed = Fix64.toFloat(player.velocity.y)
     end
 
-    -- ★ 动画参数平滑：display 值向 target 值靠拢，消除 15fps 的数值跳变
+    -- ★ 动画参数平滑：display 值向 target 值靠拢，消除 30fps 的数值跳变
     local st = player._interpState
     if st ~= nil then
         local animSmooth = 1.0 - math.exp(-12 * dt)  -- 指数平滑，半衰期约 58ms

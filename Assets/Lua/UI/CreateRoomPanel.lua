@@ -661,7 +661,7 @@ function CreateRoomPanel:BindEvents()
                     playerCount  = count,
                     gameDuration = 120,
                     targetScore  = 10,
-                    tickRate     = 15,
+                    tickRate     = 30,
                 }
 
                 -- 从已有房间启动游戏（KCP 服务器已在 Show 时启动，不重启）

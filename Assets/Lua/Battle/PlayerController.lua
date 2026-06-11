@@ -2,27 +2,28 @@
 -- Battle/PlayerController.lua — 本地玩家控制器
 -- =============================================
 -- 【职责】
---   1. 采集 InputHandler 的输入，按帧同步节奏发送到服务端
---   2. 本地预测移动（CharacterController.Move + 重力）
---   3. 第一人称摄像机挂载与控制
+--   1. 采集 InputHandler 的输入（60fps），按帧同步节奏提交到服务端（30fps）
+--   2. 翻滚状态管理（60fps 更新，编码到 moveDir bit 4）
+--   3. 第一人称摄像机控制（LateUpdate 60fps，物理回退之后）
 --   4. 攻击/射击射线检测
 --   5. 水晶拾取交互
+--   6. 客户端预测-校正：输入缓冲管理（reconciliation）
+--
+-- 【统一 30fps 物理】
+--   所有玩家（本地+远程）统一走 PlayerManager:_ApplyDeterministicMovement（30fps）
+--   渲染由 PlayerManager._InterpolateAllPlayers（LateUpdate 60fps 插值+动画）驱动
+--   摄像机由本模块 LateUpdate 60fps 驱动
 --
 -- 【双模式】
 --   主机模式：通过 HostServer.SubmitHostInput 提交输入
 --   客户端模式：通过 NetMgr.Send 发送 PlayerInput 消息
---
--- 【帧同步节奏】
---   输入采集：每 Unity 帧（60fps）
---   输入提交：每逻辑帧（15fps）
---   移动预测：每 Unity 帧（用最新输入）
 -- =============================================
 
 local GC = require("Core.GameConst")
-local Fix64 = require("Fix64")
-local Vec3  = require("Fix64Vector3")
 local InputHandler = require("Battle.InputHandler")
 local PlayerManager = require("Core.PlayerManager")
+local NetworkEventMgr = require("Core.NetworkEventMgr")
+local CrystalManager = require("Battle.CrystalManager")
 
 local PlayerController = {}
 PlayerController.__index = PlayerController
@@ -44,10 +45,14 @@ PlayerController._tickTimer = 0
 -- 蓄力时间（用于本地表现）
 PlayerController._localChargeTime = 0
 
+-- 客户端预测-校正：输入缓冲
+PlayerController._inputBuffer = {}          -- tick → {moveDir, yaw, jump}
+PlayerController._nextSendTick = 1          -- 下一个要分配的客户端 tick（1-based，0 = 服务端 stub）
+PlayerController._lastAckedTick = 0         -- 最后被服务端确认的客户端 tick
+
 -- 摄像机引用
 PlayerController._camera = nil
 PlayerController._cameraTransform = nil
-PlayerController._animator = nil   -- Animator 组件引用
 
 -- Update 回调 ID
 PlayerController._updateId = nil
@@ -68,7 +73,11 @@ function PlayerController:Init(playerId, isHost)
     self._tickTimer     = 0
     self._isRolling     = false
     self._rollTimer     = 0
-    self._isJumpingAnim = false
+
+    -- 客户端预测-校正：重置输入缓冲
+    self._inputBuffer = {}
+    self._nextSendTick = 1
+    self._lastAckedTick = 0
 
     -- 初始化输入采集
     InputHandler:Init()
@@ -76,21 +85,17 @@ function PlayerController:Init(playerId, isHost)
     -- 获取/创建摄像机
     self:_SetupCamera()
 
-    -- 获取 Animator（从玩家 GameObject 的子对象中查找）
-    local pm = PlayerManager.GetInstance()
-    local player = pm:GetPlayer(self.playerId)
-    if player ~= nil and player.gameObject ~= nil then
-        self._animator = player.gameObject:GetComponentInChildren(typeof(CS.UnityEngine.Animator))
-        if self._animator ~= nil then
-            print("[PlayerController] Animator 已就绪")
-        else
-            print("[PlayerController] 警告：未找到 Animator")
-        end
-    end
+    -- ★ 动画由 PlayerManager._UpdateRemoteAnimator 统一驱动（LateUpdate）
+    --   不再由 PlayerController 单独管理 Animator
 
-    -- 注册每帧更新
+    -- 注册每帧更新（输入 + 翻滚状态）
     self._updateId = RegisterUpdate(function(dt)
         self:Update(dt)
+    end)
+
+    -- ★ 注册 LateUpdate 渲染层（摄像机，在物理回退之后）
+    self._lateUpdateId = RegisterLateUpdate(function()
+        self:_UpdateCamera()
     end)
 
     print("[PlayerController] 初始化完成 playerId=" .. playerId .. " isHost=" .. tostring(self.isHost))
@@ -102,7 +107,14 @@ function PlayerController:Shutdown()
         UnregisterUpdate(self._updateId)
         self._updateId = nil
     end
+    if self._lateUpdateId ~= nil then
+        UnregisterLateUpdate(self._lateUpdateId)
+        self._lateUpdateId = nil
+    end
     self.initialized = false
+    self._inputBuffer = {}
+    self._nextSendTick = 1
+    self._lastAckedTick = 0
     InputHandler:UnlockCursor()
     print("[PlayerController] 已关闭")
 end
@@ -112,19 +124,17 @@ end
 function PlayerController:Update(dt)
     if not self.initialized then return end
 
-    -- 1. 采集本帧输入
+    -- 1. 采集本帧输入（60fps）
     InputHandler:Update(dt)
 
-    -- 2. 本地预测移动（每帧执行，不等待服务端）
-    self:_ApplyLocalMovement(dt)
+    -- 2. 本地输入状态管理（60fps 即时反馈：翻滚 + 跳跃动画）
+    self:_UpdateLocalInputState(dt)
 
-    -- 3. 更新摄像机
-    self:_UpdateCamera()
+    -- ★ 摄像机由 LateUpdate 驱动（在物理回退之后，读到正确的插值位置）
+    -- ★ 动画由 PlayerManager._InterpolateAllPlayers 统一驱动（LateUpdate 60fps 平滑）
+    --   不再由 PlayerController 单独更新，保证本地/远程玩家动画逻辑一致
 
-    -- 4. 更新动画参数
-    self:_UpdateAnimator(dt)
-
-    -- 5. 按逻辑帧率提交输入到服务端
+    -- 4. 按逻辑帧率提交输入到服务端（30fps）
     self._tickTimer = self._tickTimer + dt
     if self._tickTimer >= GC.TICK_INTERVAL then
         self._tickTimer = self._tickTimer - GC.TICK_INTERVAL
@@ -136,147 +146,45 @@ function PlayerController:Update(dt)
         self:_ProcessAttack(dt)
     end
 
-    -- 6. 交互检测（拾取水晶）
-    if InputHandler.skillPressed then
-        self:_ProcessInteract()
-    end
+    -- ★ 水晶拾取不再用距离遍历 — 由 CrystalComponent.OnTriggerEnter 触发
+    --   角色进入水晶 SphereCollider(isTrigger) 时自动拾取，见 CrystalManager:_HandleTriggerEnter
 end
 
--- ========== 本地移动预测 ==========
+-- ========== 本地输入状态管理（60fps 即时反馈）==========
 
--- 翻滚状态
+--- 翻滚状态（60fps 更新，供 _SubmitInput 编码到 moveDir bit 4）
 PlayerController._isRolling = false
 PlayerController._rollTimer = 0
+PlayerController._rollYaw = 0
 local ROLL_DURATION = 0.5        -- 翻滚持续秒数
-local ROLL_SPEED = 12             -- 翻滚前冲速度（比走路快）
 
---- 在本地立即应用移动（客户端预测，不等服务端确认）
-function PlayerController:_ApplyLocalMovement(dt)
+--- 每帧更新本地输入状态（60fps）
+---   - 翻滚标志通过 moveDir bit 4 提交到服务端，由 _ApplyDeterministicMovement 执行物理
+---   - 跳跃动画立即触发（不等 30fps tick），物理在下一个 tick 跟上
+function PlayerController:_UpdateLocalInputState(_dt)
     local pm = PlayerManager.GetInstance()
     local player = pm:GetPlayer(self.playerId)
-    if player == nil then return end
-    if not player.isAlive then return end
+    if player == nil or not player.isAlive then return end
 
-    local controller = player.controller
-    if controller == nil or IsNull(controller) then return end
-
-    local moveDir = InputHandler.moveDir
-    local yaw = InputHandler.cameraYaw
-
-    -- ==== 翻滚逻辑 ====
+    -- 翻滚状态管理
     if InputHandler.rollPressed and player.isGrounded and not self._isRolling then
         self._isRolling = true
         self._rollTimer = 0
-        -- 翻滚方向：有移动输入则朝移动方向翻滚，否则朝摄像机前方翻滚
-        if moveDir ~= GC.MOVE_NONE then
-            self._rollYaw = yaw  -- 用当前移动朝向
-        else
-            self._rollYaw = yaw  -- 用摄像机朝向
-        end
+        self._rollYaw = InputHandler.cameraYaw
     end
     if self._isRolling then
-        self._rollTimer = self._rollTimer + dt
+        self._rollTimer = self._rollTimer + _dt
         if self._rollTimer >= ROLL_DURATION then
             self._isRolling = false
         end
     end
 
-    -- ★ 主机模式：移动由 PlayerManager:_ApplyDeterministicMovement 统一计算（15fps）
-    --    不再自己做 controller:Move，与远程玩家走同一条物理路径，消除幻影漂移
-    if self.isHost then return end
-
-    -- ==== 水平移动 ====
-    local hSpeed = 0
-    local hVelocity
-    if self._isRolling then
-        -- 翻滚：强制前冲
-        local forward = CS.UnityEngine.Vector3(math.sin(self._rollYaw), 0, math.cos(self._rollYaw))
-        hVelocity = forward * ROLL_SPEED
-        hSpeed = ROLL_SPEED
-    elseif moveDir ~= GC.MOVE_NONE then
-        local moveVector = self:_DirToWorld(moveDir, yaw)
-        hVelocity = CS.UnityEngine.Vector3(moveVector.x * GC.MOVE_SPEED, 0, moveVector.z * GC.MOVE_SPEED)
-        hSpeed = GC.MOVE_SPEED
-    else
-        hVelocity = CS.UnityEngine.Vector3.zero
+    -- ★ 跳跃即时视觉反馈：按跳跃键时立即触发动画，不等 30fps tick
+    --   物理跳跃由 _ApplyDeterministicMovement 在下一个 tick 执行
+    --   动画由 _UpdateRemoteAnimator 读取 _jumpInitiated 驱动
+    if InputHandler.jumpPressed and player.isGrounded and not self._isRolling then
+        player._jumpInitiated = true
     end
-
-    -- ==== 垂直移动（重力 + 跳跃）====
-    local vertVelocity
-    local justJumped = false
-    if player.isGrounded then
-        if InputHandler.jumpPressed and not self._isRolling then
-            vertVelocity = GC.JUMP_FORCE
-            player.isGrounded = false
-            justJumped = true
-        else
-            -- 贴地时用较强负速度压住地面，防止起伏地形弹跳
-            vertVelocity = -GC.GRAVITY * 0.5
-        end
-    else
-        -- 空中：从存储的速度减去本帧重力
-        vertVelocity = Fix64.toFloat(player.velocity.y) - GC.GRAVITY * dt
-    end
-
-    -- ==== 执行位移 ====
-    local displacement = CS.UnityEngine.Vector3(
-        hVelocity.x * dt,
-        vertVelocity * dt,
-        hVelocity.z * dt
-    )
-
-    local ok = pcall(function() controller:Move(displacement) end)
-    if not ok then return end
-
-    -- 更新着地状态
-    -- ★ 刚刚起跳时不立即检测着地，防止首帧位移太小（<stepOffset）
-    --    导致 CharacterController.isGrounded 仍为 true 而取消跳跃
-    if not justJumped then
-        local ok2, grounded = pcall(function() return controller.isGrounded end)
-        if ok2 then player.isGrounded = grounded end
-    end
-
-    -- 同步位置
-    if player.transform ~= nil then
-        local pos = player.transform.position
-        player.position = Vec3.new(Fix64.fromFloat(pos.x), Fix64.fromFloat(pos.y), Fix64.fromFloat(pos.z))
-    end
-
-    -- 存储速度（供下一帧重力计算和动画用）
-    player._hSpeed = hSpeed
-    player.velocity = Vec3.new(
-        Fix64.fromFloat(hVelocity.x),
-        Fix64.fromFloat(vertVelocity),
-        Fix64.fromFloat(hVelocity.z)
-    )
-end
-
---- 将 moveDir 位掩码 + cameraYaw 转为世界空间方向向量
-function PlayerController:_DirToWorld(moveDir, yaw)
-    local forward = CS.UnityEngine.Vector3(math.sin(yaw), 0, math.cos(yaw))
-    local right   = CS.UnityEngine.Vector3(math.cos(yaw), 0, -math.sin(yaw))
-
-    local result = CS.UnityEngine.Vector3.zero
-
-    if moveDir & GC.MOVE_FORWARD ~= 0 then
-        result = result + forward
-    end
-    if moveDir & GC.MOVE_BACKWARD ~= 0 then
-        result = result - forward
-    end
-    if moveDir & GC.MOVE_RIGHT ~= 0 then
-        result = result + right
-    end
-    if moveDir & GC.MOVE_LEFT ~= 0 then
-        result = result - right
-    end
-
-    -- 归一化（斜向移动时保持速度一致）
-    if result.magnitude > 1 then
-        result = result.normalized
-    end
-
-    return result
 end
 
 -- ========== 摄像机 ==========
@@ -377,54 +285,6 @@ function PlayerController:_UpdateCamera()
     self._cameraTransform.rotation = CS.UnityEngine.Quaternion.Euler(pitchDeg, yawDeg, 0)
 end
 
--- ========== 动画驱动 ==========
-
---- 每帧更新 Animator 参数
-function PlayerController:_UpdateAnimator(dt)
-    if self._animator == nil then return end
-    if IsNull(self._animator) then self._animator = nil; return end
-
-    local anim = self._animator
-    local pm = PlayerManager.GetInstance()
-    local player = pm:GetPlayer(self.playerId)
-
-    -- 水平速度：实际速度归一化到 0~1（走路=1.0，停止=0）
-    local hSpeed = 0
-    if player ~= nil and player._hSpeed ~= nil then
-        hSpeed = player._hSpeed / GC.MOVE_SPEED
-    end
-
-    -- 垂直速度：只有真正在空中时才非零，贴地时强制为 0
-    local vSpeed = 0
-    local isGrounded = true
-    if player ~= nil then
-        isGrounded = player.isGrounded
-        if not isGrounded and not IsNull(player.controller) then
-            -- 空中：读取存储的垂直速度
-            vSpeed = Fix64.toFloat(player.velocity.y)
-        end
-        -- 贴地时 vSpeed 保持 0
-    end
-
-    anim:SetFloat("HSpeed", hSpeed)
-    anim:SetFloat("VSpeed", vSpeed)
-
-    -- 动作 bool
-    anim:SetBool("Fire", InputHandler.attackHeld)
-    anim:SetBool("Skill", InputHandler.skillPressed or false)
-
-    -- ★ Jump 只在玩家主动按空格时触发，自动上台阶/起伏地形不触发
-    if InputHandler.jumpPressed and isGrounded then
-        self._isJumpingAnim = true
-    elseif isGrounded then
-        self._isJumpingAnim = false
-    end
-    anim:SetBool("Jump", self._isJumpingAnim)
-
-    anim:SetBool("Roll", self._isRolling)
-    anim:SetBool("Reload", InputHandler.reloadPressed)
-end
-
 -- ========== 输入提交 ==========
 
 --- 按逻辑帧率提交输入到服务端
@@ -477,13 +337,24 @@ function PlayerController:_SubmitClientInput(input)
     -- 构造 PlayerInput protobuf 消息
     local playerInput = CS.GameProto.PlayerInput()
     playerInput.PlayerId = self.playerId
-    playerInput.Tick = 0
+    local clientTick = self._nextSendTick
+    self._nextSendTick = clientTick + 1
+    playerInput.Tick = clientTick
+
     -- ★ 翻滚编码到 MoveDir 的 bit 4（不修改 proto）
     local moveDir = input.moveDir
     if self._isRolling then
         moveDir = moveDir | GC.MOVE_ROLL
     end
     playerInput.MoveDir = moveDir
+
+    -- ★ 客户端预测-校正：缓存输入供回滚重放（含翻滚标记）
+    self._inputBuffer[clientTick] = {
+        moveDir = moveDir,
+        yaw     = input.cameraYaw,
+        jump    = input.jump,
+    }
+    self:_TrimInputBuffer()
     playerInput.Jump = input.jump
     playerInput.Attack = input.attack
     playerInput.Skill = input.skill
@@ -500,44 +371,118 @@ end
 
 --- 处理攻击/射击（每帧调用，attackHeld 为 true 时）
 function PlayerController:_ProcessAttack(dt)
-    -- TODO: 实现射击逻辑
+    -- 仅在攻击阶段可以攻击
+    if not NetworkEventMgr._canAttack then return end
+
+    -- TODO: 实现射击逻辑（后续单独实现）
     -- 1. 从摄像机中心做射线检测
     -- 2. 命中其他玩家 → 上报 PlayerHit 到服务端
     -- 3. 播放枪口特效/音效
-
-    -- 示例射线检测代码：
-    -- local cam = self._camera
-    -- if cam == nil then return end
-    -- local ray = CS.UnityEngine.Ray(cam.transform.position, cam.transform.forward)
-    -- local hitInfo = CS.UnityEngine.RaycastHit()
-    -- if CS.UnityEngine.Physics.Raycast(ray, hitInfo, 100) then
-    --     -- 检测是否命中玩家
-    --     local hitGo = hitInfo.collider.gameObject
-    --     -- 上报命中事件...
-    -- end
 end
 
 -- ========== 交互处理 ==========
 
---- 处理交互/拾取（skillPressed 为 true 时）
+--- 处理水晶拾取（距离检测，不依赖按键，自动拾取最近的水晶）
+--- ★ 全程可拾取（生成阶段 + 攻击阶段均可）
 function PlayerController:_ProcessInteract()
-    -- TODO: 实现水晶拾取逻辑
-    -- 1. 从摄像机中心做射线检测
-    -- 2. 命中水晶 → 上报 CrystalPickup 到服务端
-    -- 3. 服务端验证后广播权威结果
+    local pm = PlayerManager.GetInstance()
+    local player = pm:GetPlayer(self.playerId)
+    if player == nil or player.transform == nil then return end
 
-    -- 示例：
-    -- local cam = self._camera
-    -- if cam == nil then return end
-    -- local ray = CS.UnityEngine.Ray(cam.transform.position, cam.transform.forward)
-    -- local hitInfo = CS.UnityEngine.RaycastHit()
-    -- if CS.UnityEngine.Physics.Raycast(ray, hitInfo, 3) then
-    --     local hitGo = hitInfo.collider.gameObject
-    --     -- 检测是否为水晶（通过 tag 或组件判断）
-    --     if hitGo.CompareTag("Crystal") then
-    --         self:_SendCrystalPickup(crystalId)
-    --     end
-    -- end
+    local cm = CrystalManager.GetInstance()
+    local pickupRange = cm:GetPickupRange() or 0.8
+
+    local myPos = player.transform.position
+
+    -- 遍历所有水晶，找最近的在范围内的
+    local nearestId, nearestDist = nil, math.huge
+    for crystalId, go in cm:ForEach() do
+        if go ~= nil and not IsNull(go) then
+            -- Tag 检查（CompareTag 在已销毁对象上会抛异常，先判空）
+            local ok, hasTag = pcall(function() return go.CompareTag("Crystal") end)
+            if ok and hasTag then
+                local crystalPos = go.transform.position
+                local dx, dy, dz = myPos.x - crystalPos.x,
+                                   myPos.y - crystalPos.y,
+                                   myPos.z - crystalPos.z
+                local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+                if dist < pickupRange and dist < nearestDist then
+                    nearestDist = dist
+                    nearestId = crystalId
+                end
+            end
+        end
+    end
+
+    -- 如果在范围内，发送拾取请求
+    if nearestId ~= nil then
+        self:_SendCrystalPickup(nearestId)
+    end
+end
+
+--- 发送水晶拾取请求到服务端
+function PlayerController:_SendCrystalPickup(crystalId)
+    if crystalId == nil then return end
+
+    local pickupMsg = CS.GameProto.CrystalPickup()
+    pickupMsg.CrystalId = crystalId
+    pickupMsg.PlayerId = self.playerId
+
+    local envelope = CS.GameProto.NetMessage()
+    envelope.CrystalPickup = pickupMsg
+
+    if self.isHost then
+        -- 主机模式：直接调服务端处理
+        local hostServer = CS.HostServer.Instance
+        if hostServer ~= nil then
+            hostServer:SubmitHostCrystalPickup(crystalId, self.playerId)
+        end
+    else
+        -- 客户端模式：发送网络消息
+        local netMgr = CS.NetMgr.Instance
+        if netMgr ~= nil then
+            netMgr:Send(envelope)
+        end
+    end
+end
+
+-- ========== 客户端预测-校正：输入缓冲管理 ==========
+
+--- 裁剪超出容量的旧输入
+function PlayerController:_TrimInputBuffer()
+    local maxBuf = GC.INPUT_BUFFER_MAX or 90
+    local cutoff = self._nextSendTick - maxBuf
+    if cutoff <= 0 then return end
+    for tick, _ in pairs(self._inputBuffer) do
+        if tick < cutoff then
+            self._inputBuffer[tick] = nil
+        end
+    end
+end
+
+--- 确认服务端已消费到指定 tick，清除已确认的输入
+--- @param tick int — 已确认的最大客户端 tick（含），之前的全部清除
+function PlayerController:AcknowledgeUpTo(tick)
+    if tick <= self._lastAckedTick then return end
+    self._lastAckedTick = tick
+    for t, _ in pairs(self._inputBuffer) do
+        if t <= tick then
+            self._inputBuffer[t] = nil
+        end
+    end
+end
+
+--- 获取所有未被服务端确认的输入（按 tick 升序排列）
+--- @return table[] — {{tick=int, data={moveDir,yaw,jump}}, ...}
+function PlayerController:GetUnackedInputs()
+    local result = {}
+    for tick, data in pairs(self._inputBuffer) do
+        if tick > self._lastAckedTick then
+            result[#result + 1] = { tick = tick, data = data }
+        end
+    end
+    table.sort(result, function(a, b) return a.tick < b.tick end)
+    return result
 end
 
 return PlayerController

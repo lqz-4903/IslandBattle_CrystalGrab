@@ -38,13 +38,13 @@ public class TickSyncHandler
     #region =============== 配置 ===============
 
     // 逻辑帧率（帧/秒）
-    private const int DefaultTickRate = 15;
+    private const int DefaultTickRate = 30;
 
     // 等待单帧输入的最大时间（使用 Fix64 确定性比较）
-    private static readonly Fix64 MaxWaitTime = Fix64.FromFloat(0.1f);
+    private static readonly Fix64 MaxWaitTime = Fix64.FromFloat(0.05f);
 
     // 保留的帧历史数量（用于断线重连）
-    private const int MaxTickHistory = 1500; // 约100秒 @ 15fps
+    private const int MaxTickHistory = 3000; // 约100秒 @ 30fps
 
     #endregion
 

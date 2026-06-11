@@ -213,12 +213,21 @@ public readonly struct Fix64 : IEquatable<Fix64>, IComparable<Fix64>
             bit >>= 2;
         }
 
-        // Newton 精修 1 轮（安全分解，避免 (a.Raw << 32) 溢出）:
-        // r1 = (r0 + a/r0) / 2
-        // a/r0 用分解：商 = a.Raw / result, 余 = a.Raw % result
+        // ★ 二进制开方输出 16.16 格式（sqrt(raw) ≈ sqrt(V)*2^16）
+        //   先升到 32.32 格式，再做 Newton 精修
+        result <<= 16;  // 16.16 → 32.32
+
+        // Newton 精修 1 轮：r1 = (r0 + a/r0) / 2
+        // a/r0 = quot * ONE + rem * ONE / result
+        // rem * ONE = rem * 2^32，拆为两级避免溢出（rem 接近 result 时 rem<<32 会溢出 long）
+        //   rem * 2^32 / result = (rem * 2^16) / result * 2^16
+        //                      + ((rem * 2^16) % result) * 2^16 / result
         long quot = a.Raw / result;
         long rem = a.Raw % result;
-        long div = (quot << FRACTIONAL_BITS) + ((rem << FRACTIONAL_BITS) / result);
+        long q1 = (rem << 16) / result;       // rem * 2^16 / result → 高 16 位小数
+        long r1 = (rem << 16) % result;
+        long q2 = (r1 << 16) / result;        // 低 16 位小数
+        long div = (quot << FRACTIONAL_BITS) + (q1 << 16) + q2;
         result = (result + div) >> 1;
 
         return new Fix64(result);

@@ -247,7 +247,7 @@ public class RoomHandler
             PlayerCount = room.ConvToPlayer.Count,
             GameDuration = request.GameDuration > 0 ? request.GameDuration : 120f,
             TargetScore = request.TargetScore > 0 ? request.TargetScore : 10,
-            TickRate = request.TickRate > 0 ? request.TickRate : 15
+            TickRate = request.TickRate > 0 ? request.TickRate : 30
         };
 
         var envelope = new NetMessage { GameStart = gameStart };

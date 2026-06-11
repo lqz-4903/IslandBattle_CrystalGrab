@@ -7,9 +7,9 @@ local TE = require("Test.TestEnv")
 local GC = require("Core.GameConst")
 local Fix64 = require("Fix64")
 
-local MOVE_INTERVAL = 1 / 15   -- 秒/tick
-local WALK_SPEED = 5           -- m/s
-local WALK_PER_TICK = WALK_SPEED * MOVE_INTERVAL  -- ≈ 0.3333m
+local MOVE_INTERVAL = GC.TICK_INTERVAL   -- 秒/tick
+local WALK_SPEED = GC.MOVE_SPEED        -- m/s
+local WALK_PER_TICK = WALK_SPEED * MOVE_INTERVAL
 local ROLL_SPEED = 12
 local ROLL_PER_TICK = ROLL_SPEED * MOVE_INTERVAL  -- ≈ 0.8m
 

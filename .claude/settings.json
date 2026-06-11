@@ -1,0 +1,9 @@
+{
+  "skills": {
+    "fix-bug": ".claude/skills/fix-bug.md",
+    "gen-proto": ".claude/skills/gen-proto.md",
+    "multi-test": ".claude/skills/multi-test.md",
+    "net-debug": ".claude/skills/net-debug.md",
+    "test-sync": ".claude/skills/test-sync.md"
+  }
+}

@@ -18,6 +18,7 @@ using UnityEngine.Events;
 ///   C# 侧：EventCenter → 本类静态回调 → Lua 函数
 ///
 /// 【消息类型对照】
+///   16 GameStart      → OnGameStart(GameStart msg)
 ///   30 CrystalSpawn   → OnCrystalSpawn(CrystalSpawn msg)
 ///   31 CrystalPickup  → OnCrystalPickup(CrystalPickup msg)
 ///   32 PlayerHit      → OnPlayerHit(PlayerHit msg)
@@ -25,7 +26,8 @@ using UnityEngine.Events;
 ///   34 GameEnd        → OnGameEnd(GameEnd msg)
 ///   35 PlayerRespawn  → OnPlayerRespawn(PlayerRespawn msg)
 ///   37 PlayerOffline  → OnPlayerOffline(PlayerOffline msg)
-///   16 GameStart      → OnGameStart(GameStart msg)
+///   38 PhaseSwitch    → OnPhaseSwitch(PhaseSwitch msg)
+///   39 CrystalDrop    → OnCrystalDrop(CrystalDrop msg)
 /// ═══════════════════════════════════════════════════════════════
 /// </summary>
 public static class LuaEventBridge
@@ -56,12 +58,16 @@ public static class LuaEventBridge
     /// <summary>游戏开始（客户端收到）：function(gameStartMsg)</summary>
     public static Action<GameStart> OnGameStart;
 
+    /// <summary>阶段切换：function(phaseSwitchMsg)</summary>
+    public static Action<PhaseSwitch> OnPhaseSwitch;
+
+    /// <summary>死亡掉落：function(crystalDropMsg)</summary>
+    public static Action<CrystalDrop> OnCrystalDrop;
+
     #endregion
 
     #region =============== 内部：EventCenter 监听器引用（用于正确移除） ===============
 
-    // ★ 存储监听器委托引用，以便 Shutdown() 时能正确从 EventCenter 移除
-    //    之前的实现使用内联 lambda，导致无法 RemoveListener，每次 Initialize/Shutdown 循环都会泄漏
     private static UnityAction<IMessage> _onCrystalSpawnListener;
     private static UnityAction<IMessage> _onCrystalPickupListener;
     private static UnityAction<IMessage> _onPlayerHitListener;
@@ -70,6 +76,8 @@ public static class LuaEventBridge
     private static UnityAction<IMessage> _onGameEndListener;
     private static UnityAction<IMessage> _onPlayerOfflineListener;
     private static UnityAction<IMessage> _onGameStartListener;
+    private static UnityAction<IMessage> _onPhaseSwitchListener;
+    private static UnityAction<IMessage> _onCrystalDropListener;
 
     #endregion
 
@@ -119,6 +127,14 @@ public static class LuaEventBridge
         { if (msg is GameStart m) OnGameStart?.Invoke(m); };
         EventCenter.AddListener(16, _onGameStartListener);
 
+        _onPhaseSwitchListener = (IMessage msg) =>
+        { if (msg is PhaseSwitch m) OnPhaseSwitch?.Invoke(m); };
+        EventCenter.AddListener(38, _onPhaseSwitchListener);
+
+        _onCrystalDropListener = (IMessage msg) =>
+        { if (msg is CrystalDrop m) OnCrystalDrop?.Invoke(m); };
+        EventCenter.AddListener(39, _onCrystalDropListener);
+
         Debug.Log("[LuaEventBridge] 所有游戏事件监听已注册");
     }
 
@@ -148,6 +164,10 @@ public static class LuaEventBridge
         { EventCenter.RemoveListener(37, _onPlayerOfflineListener); _onPlayerOfflineListener = null; }
         if (_onGameStartListener != null)
         { EventCenter.RemoveListener(16, _onGameStartListener); _onGameStartListener = null; }
+        if (_onPhaseSwitchListener != null)
+        { EventCenter.RemoveListener(38, _onPhaseSwitchListener); _onPhaseSwitchListener = null; }
+        if (_onCrystalDropListener != null)
+        { EventCenter.RemoveListener(39, _onCrystalDropListener); _onCrystalDropListener = null; }
 
         // 清空 Lua 回调引用，防止悬挂
         OnCrystalSpawn = null;
@@ -158,6 +178,8 @@ public static class LuaEventBridge
         OnGameEnd = null;
         OnPlayerOffline = null;
         OnGameStart = null;
+        OnPhaseSwitch = null;
+        OnCrystalDrop = null;
 
         Debug.Log("[LuaEventBridge] 已关闭，所有 EventCenter 监听器已移除，回调已清空");
     }

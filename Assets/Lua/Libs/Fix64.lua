@@ -112,6 +112,10 @@ function Fix64.sqrt(a)
         bit = bit >> 2
     end
 
+    -- ★ 二进制开方输出 16.16 格式（sqrt(raw) ≈ sqrt(V)*2^16）
+    --   先升到 32.32 格式，再做 Newton 精修
+    result = result * 65536  -- 16.16 → 32.32
+
     -- Newton 精修 1 轮：r' = (r + a/r) / 2
     -- ★ 使用 2 级分解避免 rem * ONE 溢出 Lua 53 位精度：
     --   floor(rem * ONE / result) 拆为 floor(rem * 2^16 / result) * 2^16

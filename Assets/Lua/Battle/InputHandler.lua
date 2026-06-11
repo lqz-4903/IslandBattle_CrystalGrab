@@ -3,7 +3,7 @@
 -- =============================================
 -- 【职责】
 --   每帧采集 Unity Input，累积鼠标视角旋转，
---   按帧同步节奏（15fps）提供标准化的输入数据。
+--   按帧同步节奏（30fps）提供标准化的输入数据。
 --
 -- 【输入编码】
 --   moveDir: 4 位 WASD 位掩码（见 GameConst）
@@ -102,7 +102,7 @@ function InputHandler:Update(dt)
 
     -- 动作按键（攻击/技能用直接鼠标检测，绕过 InputManager 防止 Ctrl 等键盘误触发）
     -- ★ GetButtonDown/GetKeyDown 只在按下的那一帧返回 true，下一帧就会被覆盖为 false
-    --    如果 tick（15fps）刚好不在那一帧触发，输入就丢了。所以用粘滞标记：
+    --    如果 tick（30fps）刚好不在那一帧触发，输入就丢了。所以用粘滞标记：
     --    Update 只负责拉高（true），GetTickInput 消费后才拉低（false）
     if CS.UnityEngine.Input.GetButtonDown(GC.KEY.JUMP) then
         self.jumpPressed = true
@@ -149,7 +149,7 @@ end
 -- ========== 逻辑帧输入获取 ==========
 
 --- 获取当前帧的标准化输入，并重置瞬发动作（jump/skill）
---- 调用频率：逻辑帧率（15fps）
+--- 调用频率：逻辑帧率（30fps）
 --- @return table {moveDir, jump, attack, skill, cameraYaw, chargeTime}
 function InputHandler:GetTickInput()
     local input = {

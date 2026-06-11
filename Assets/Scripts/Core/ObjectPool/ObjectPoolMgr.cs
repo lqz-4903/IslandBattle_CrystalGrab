@@ -172,7 +172,8 @@ public class ObjectPoolMgr
         {
             // 通过AB包同步加载并实例化
             obj = ABMgr.Instance.LoadRes<GameObject>(abName, resName);
-            obj.name = resName;
+            if (obj != null)
+                obj.name = resName;
         }
         return obj;
     }
@@ -225,7 +226,8 @@ public class ObjectPoolMgr
     private GameObject CreateNewObject_AB(string abName, string resName)
     {
         GameObject obj = ABMgr.Instance.LoadRes<GameObject>(abName, resName);
-        obj.name = resName;
+        if (obj != null)
+            obj.name = resName;
         return obj;
     }
 

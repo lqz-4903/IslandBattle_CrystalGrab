@@ -5,7 +5,7 @@
 **IslandBattle_CrystalGrab** — 基于 Unity + XLua 的多人联机对战游戏 Demo。
 
 - **玩法**：2-4 名玩家在岛屿场景中对抗，拾取水晶得分，目标 10 分获胜，限时 120 秒。
-- **网络模型**：Client-Server 帧同步（15fps 逻辑帧），房主即服务器（HostServer），通过 KCP over UDP 通信。
+- **网络模型**：Client-Server 帧同步（30fps 逻辑帧），房主即服务器（HostServer），通过 KCP over UDP 通信。
 - **权威模式**：服务端权威（主机执行确定性物理，广播 `InputTick` 附带权威位置），客户端做 60fps 预测 + 平滑插值 + 硬回滚校正。
 - **仓库**：`git@github.com:lqz-4903/IslandBattle_CrystalGrab.git`
 
@@ -49,7 +49,7 @@ Assets/
 │   ├── NetLogic/
 │   │   ├── HostServer.cs       # 主机服务器协调器（RoomHandler + TickSync + GameEvent）
 │   │   ├── RoomHandler.cs      # 房间管理（创建/加入/开始）
-│   │   ├── TickSyncHandler.cs  # 帧同步核心（15fps，收集输入→组装InputTick→广播）
+│   │   ├── TickSyncHandler.cs  # 帧同步核心（30fps，收集输入→组装InputTick→广播）
 │   │   ├── TickExecutor.cs     # 帧执行器（驱动 Lua 侧帧逻辑）
 │   │   └── GameEventHandler.cs # 游戏事件（水晶/受击/坠落/结算）
 │   ├── Core/
@@ -89,7 +89,7 @@ Protobuf/                       # proto 定义 + 生成产物
 ──────                            ──────────
 InputHandler (60fps 采集)         
   ↓                               
-PlayerController (输入提交 15fps)  
+PlayerController (输入提交 30fps)
   ↓ NetMgr.Send(PlayerInput)      → TickSyncHandler 收集所有玩家输入
                                      ↓ 收齐或超时 → 组装 InputTick
                                      ↓ 广播 InputTick + 执行确定性物理
@@ -105,7 +105,7 @@ PlayerManager:OnFrameEnd           远程玩家 _ApplyDeterministicMovement
 ### 远程玩家插值系统（60fps 平滑）
 
 ```
-_ApplyDeterministicMovement (15fps):
+_ApplyDeterministicMovement (30fps):
   prevPos = 旧 targetPos           ← 链式传递
   物理执行 CharacterController.Move
   targetPos = 结果位置               ← 物理终点
@@ -145,21 +145,37 @@ Unity Update (C# GameMgr)
 ### 已完成
 - [x] KCP 网络框架（握手/收发/心跳/断线重连）
 - [x] 房间系统（创建/加入/玩家列表/开始游戏）
-- [x] 帧同步（15fps TickSync + TickExecutor + Lua 回调链）
+- [x] 帧同步（30fps TickSync + TickExecutor + Lua 回调链）
 - [x] UI 框架（12 个面板 + UICamera 双层渲染防穿透）
 - [x] 角色动画（Animator 驱动 HSpeed/VSpeed/Jump/Roll/Fire/Skill）
 - [x] 移动 + 摄像机（WASD + 鼠标 FPS 视角 + CharacterController）
 - [x] 跳跃/翻滚
-- [x] 远程玩家插值（15fps → 60fps smoothstep）
+- [x] 远程玩家插值（30fps → 60fps smoothstep）
 - [x] Phase 2 服务端权威位置校正
 - [x] AssetBundle 资源管理
+- [x] **水晶系统**：5 区域独立生成、距离拾取、持有数×6 分、死亡掉落 30% 向上取整、重生
+- [x] **阶段系统**：准备→生成→攻击 三轮交替（127s），生成阶段不能打、攻击阶段停生、全程可捡
+- [x] Proto 新增：PhaseSwitch(38)、CrystalDrop(39)
 
 ### 待完成
-- [ ] **攻击/射击系统**：射线检测逻辑（[PlayerController.lua:498](Assets/Lua/Battle/PlayerController.lua#L498) 注释待实现）
-- [ ] **水晶系统**：场景水晶 GameObject 生成/拾取/移除（[NetworkEventMgr.lua:104](Assets/Lua/Core/NetworkEventMgr.lua#L104) 注释待实现）
+- [ ] **攻击/射击系统**：射线检测逻辑（[PlayerController.lua:376](Assets/Lua/Battle/PlayerController.lua#L376) — 阶段开关已加，攻击逻辑待实现）
+- [ ] **水晶 Prefab 配置**：需要给 `ArtRes/.../Crystal_01.prefab` 添加 Tag="Crystal" + CrystalComponent 组件，并打包进 AssetBundle
+- [ ] **场景生成区域配置**：需要在 GameScene 中放置 5 个 `CrystalSpawnZone` 空节点
 - [ ] **画面流畅度**：远程玩家画面仍有卡顿待处理
 - [ ] **游戏场景地形优化**：当前 Batches 3500+，DrawCall 偏高
 - [ ] ParrelSync 多客户端调试支持（插件已导入）
+
+### 水晶系统规则
+| 参数 | 值 |
+|---|---|
+| 游戏时长 | 127 秒（7s 准备 + 3 轮 20s 生成 + 20s 攻击） |
+| 每水晶分数 | 6 分 |
+| 生成区域 | 5 个圆形区域（场景 `CrystalSpawnZone` 组件配置） |
+| 每区域间隔 | 1.5 秒/颗 |
+| 同时在场上限 | **无** |
+| 拾取方式 | 距离检测（0.8m），全程可捡 |
+| 死亡掉落 | ceil(持有数 × 0.3)，掉在死亡位置附近 |
+| 胜负 | 127s 结束时分数最高者获胜，并列则并列获胜 |
 
 ---
 
@@ -193,7 +209,7 @@ CS.TickExecutor.OnApplyPlayerInput = function(input) ... end
 | 跳跃初速 | 8 m/s |
 | 重力 | 20 m/s² |
 | 翻滚速度 | 12 m/s，持续 0.5s |
-| 逻辑帧率 | 15 fps |
+| 逻辑帧率 | 30 fps |
 | 物理子步 | 8（≈120fps 碰撞精度） |
 | CharacterController | height=1.8, radius=0.4, stepOffset=0.3 |
 
@@ -218,7 +234,7 @@ CS.TickExecutor.OnApplyPlayerInput = function(input) ... end
 
 1. Unity 打开项目，加载 `BeginScene`
 2. 运行 → 大厅 UI → 创建房间 → 加入房间（可用 ParrelSync 开第二个客户端）
-3. 房主点击开始游戏 → 切换到 `GameScene` → 15fps 帧同步启动
+3. 房主点击开始游戏 → 切换到 `GameScene` → 30fps 帧同步启动
 
 ### Protobuf 更新
 

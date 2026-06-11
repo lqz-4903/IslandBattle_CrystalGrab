@@ -36,6 +36,8 @@ message NetMessage{
 		PlayerRespawn  	player_respawn  	= 35;
 		GameTimerUpdate game_timer_update	= 36;
 		PlayerOffline   player_offline    = 37;
+		PhaseSwitch     phase_switch      = 38;
+		CrystalDrop     crystal_drop      = 39;
 
 		// 重连
 		Reconnect 	  reconnect 				= 40;
@@ -207,6 +209,20 @@ message GameTimerUpdate{
 message PlayerOffline{
 	int32  player_id   = 1;
 	string player_name = 2;
+}
+
+// 38 阶段切换广播
+message PhaseSwitch{
+	int32 phase_type = 1;	// 0=准备, 1=生成, 2=攻击, 3=结束
+	int32 round      = 2;	// 当前轮次（0=准备, 1/2/3）
+	float remaining  = 3;	// 游戏剩余秒数
+}
+
+// 39 死亡掉落水晶
+message CrystalDrop{
+	int32 count      = 1;	// 掉落数量
+	int32 player_id  = 2;	// 死亡玩家ID
+	int32 new_score  = 3;	// 死亡后玩家新分数
 }
 
 // ============== 短线重连 ============

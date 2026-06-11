@@ -1,4 +1,4 @@
-﻿using GameProto;
+using GameProto;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,9 +8,12 @@ using UnityEngine;
 /// ═══════════════════════════════════════════════════════════════
 ///
 /// 【职责】
-///   - 周期性生成水晶并广播
-///   - 验证并处理水晶拾取、玩家受击、玩家坠落
-///   - 判定游戏结束
+///   - 127s 全局计时器
+///   - 5 区域水晶生成（每区域 2s 间隔，总共 45 颗上限——只算区域生成，不含死亡掉落）
+///   - 全程可攻击 + 全程可采集（无阶段限制）
+///   - 水晶拾取验证 + 分数（持有数×6）
+///   - 死亡掉落（ceil(持有×0.3)）+ 重生
+///   - 时间结束按分数判定胜负（并列获胜）
 ///
 /// 【原则】
 ///   所有事件由服务端权威判定，客户端只负责上报和表现
@@ -24,55 +27,65 @@ public class GameEventHandler
 
     #region =============== 配置 ===============
 
-    // 水晶生成间隔（秒）—— 确定性定点数
-    private static readonly Fix64 CrystalSpawnInterval = Fix64.FromInt(5);
-    // 最大同时存在水晶数
-    private const int MaxCrystals = 5;
-    // 胜利所需分数
-    private const int DefaultWinScore = 10;
-    // 默认游戏时长（秒）—— 确定性定点数
-    private static readonly Fix64 DefaultGameDuration = Fix64.FromInt(120);
+    // ★ 水晶分值
+    private const int CrystalScoreValue = 6;
+    // ★ 各区生成间隔（秒）
+    private static readonly Fix64 ZoneSpawnInterval = Fix64.FromFloat(2.0f);
+    // ★ 五个区域总共生成上限（只算区域生成，不算死亡掉落）
+    private const int MaxZoneSpawned = 45;
+    // ★ 游戏总时长（秒）
+    private static readonly Fix64 GameDuration = Fix64.FromFloat(127f);
+    // ★ 初始 HP
+    private const int InitialHP = 3;
+    // ★ 掉落比例
+    private static readonly Fix64 DropRatio = Fix64.FromFloat(0.3f);
 
     #endregion
 
     #region =============== 状态 ===============
 
-    // 是否正在运行
     private bool _isRunning;
-    // 晶石生成计时器
-    private Fix64 _crystalSpawnTimer;
-    // 下一个晶石ID
-    private int _nextCrystalId = 1;
-    // 获胜分数
-    private int _winScore;
-    // 确定性模拟随机数
-    private DeterministicRandom _rng;
+    private bool _zonesInitialized;  // 延迟扫描标志（等 GameScene 加载完毕）
+    private int _zoneRetryAttempts;  // 重试计数器（首次 Tick 时 GameScene 可能尚未加载完）
 
-    // 当前存活的水晶
+    // --- 计时器 ---
+    private Fix64 _elapsed;           // 对局已过时间
+
+    // --- 区域生成 ---
+    private struct SpawnZone
+    {
+        public Fix64 CenterX, CenterY, CenterZ;
+        public Fix64 Radius;
+    }
+    private SpawnZone[] _spawnZones;
+    private Fix64[] _zoneTimers;      // 5 个区域的各自计时器
+
+    // --- 水晶 ---
+    private int _nextCrystalId = 1;
+    private int _zoneSpawnedCount;  // ★ 五个区域已生成总数（只算区域，不算死亡掉落）
     private Dictionary<int, CrystalData> _activeCrystals = new();
 
-    //  玩家分数：playerId -> score
-    private Dictionary<int, int> _playerScores = new();
-
-    // 玩家生命值：playerId -> hp
+    // --- 玩家 ---
+    private Dictionary<int, int> _playerHoldings = new();  // 持有水晶数
     private Dictionary<int, int> _playerHPs = new();
+    private Dictionary<int, Vector3> _playerBirthPos = new(); // 出生点
+    private Dictionary<int, Vector3> _playerLastPos = new();  // 最近位置（用于掉落）
 
-    // 游戏倒计时（使用 Fix64 保证跨平台确定性）
-    private Fix64 _gameTimer;
-    // 上次广播倒计时的时间（用于控制广播频率，每秒一次）
-    private Fix64 _lastBroadcastTime;
+    // --- 确定性随机 ---
+    private DeterministicRandom _rng;
+
+    // --- 定时器 ---
+    private Fix64 _lastTimerBroadcast;
 
     #endregion
 
     #region =============== 内部数据结构 ===============
 
-    /// <summary>水晶数据（内部使用 Fix64 保证确定性）</summary>
     private struct CrystalData
     {
         public int CrystalId;
         public Fix64 PosX, PosY, PosZ;
     }
-
 
     #endregion
 
@@ -87,48 +100,48 @@ public class GameEventHandler
 
     #region =============== 启动 / 停止 ===============
 
-    /// <summary>
-    /// 开始游戏事件循环
-    /// </summary>
-    /// <param name="randomSeed"> 随机种子（从GameStart开始） </param>
-    /// <param name="targetScore"> 胜利分数 （从GameStart开始）</param>
-    /// <param name="gameDuration"> 游戏时长（秒）</param>
-    public void StartGameLoop(int randomSeed, int targetScore = DefaultWinScore, Fix64 gameDuration = default)
+    public void StartGameLoop(int randomSeed, Fix64 gameDuration = default)
     {
-        if (gameDuration.Raw == 0) gameDuration = DefaultGameDuration;
+        if (gameDuration.Raw == 0) gameDuration = GameDuration;
 
         _isRunning = true;
-        _crystalSpawnTimer = Fix64.Zero;
+        _elapsed = Fix64.Zero;
         _nextCrystalId = 1;
-        _winScore = targetScore;
+        _zoneSpawnedCount = 0;  // ★ 重置区域生成计数器
         _rng = new DeterministicRandom(randomSeed);
         _activeCrystals.Clear();
-        _playerScores.Clear();
+        _playerHoldings.Clear();
         _playerHPs.Clear();
+        _playerBirthPos.Clear();
+        _playerLastPos.Clear();
 
-        // 初始化游戏计时器（Fix64）
-        _gameTimer = gameDuration;
-        _lastBroadcastTime = gameDuration;
+        // ★ 延迟到 GameScene 加载后再扫描 CrystalSpawnZone
+        //   Tick 在场景切换期间就会开始运行，EnsureZonesInitialized 会重试直到对象可用
+        _zonesInitialized = false;
+        _zoneRetryAttempts = 0;
 
+        // --- 初始化玩家 ---
         var room = _host.CurrentRoom;
         if (room != null)
         {
             foreach (int playerId in room.GetAllPlayerIds())
             {
-                _playerScores[playerId] = 0;
-                _playerHPs[playerId] = 3; // 默认3条命
+                _playerHoldings[playerId] = 0;
+                _playerHPs[playerId] = InitialHP;
+                _playerBirthPos[playerId] = Vector3.zero;
+                _playerLastPos[playerId] = Vector3.zero;
             }
         }
 
-        Debug.Log("【GameEventHandler】启动 seed：" + randomSeed + " 目标分数：" + targetScore + " 游戏时长：" + gameDuration.ToFloat() + "秒");
+        _lastTimerBroadcast = Fix64.Zero;
 
-        // 立即广播一次初始倒计时
+        Debug.Log("【GameEventHandler】启动 seed:" + randomSeed +
+                  " 时长:" + gameDuration.ToFloat() + "s" +
+                  " 分数:每水晶" + CrystalScoreValue + "分");
+
         BroadcastTimerUpdate();
     }
 
-    /// <summary>
-    /// 停止游戏事件循环
-    /// </summary>
     public void Stop()
     {
         _isRunning = false;
@@ -137,98 +150,192 @@ public class GameEventHandler
 
     #endregion
 
-    #region =============== Tick (HostServer.Update 驱动) ===============
+    #region =============== Tick ===============
 
-    /// <summary>每帧 Tick，deltaTime 为 Fix64 确定性时间增量</summary>
     public void Tick(Fix64 deltaTime)
     {
         if (!_isRunning) return;
 
-        // 游戏倒计时（服务端权威，不受玩家断线影响）
-        _gameTimer -= deltaTime;
-        if (_gameTimer <= Fix64.Zero)
+        // ★ 延迟扫描：Tick 在 LoadScene 完成前就会开始，EnsureZonesInitialized 内部重试直到 CPS 对象可用
+        if (!_zonesInitialized) EnsureZonesInitialized();
+
+        _elapsed += deltaTime;
+
+        // === 游戏结束 ===
+        if (_elapsed >= GameDuration)
         {
-            _gameTimer = Fix64.Zero;
-            BroadcastTimerUpdate();
             OnTimerEnd();
             return;
         }
 
-        // 每秒广播一次倒计时给所有客户端
-        if (_lastBroadcastTime - _gameTimer >= Fix64.One)
+        // === 每秒广播倒计时 ===
+        if (_elapsed - _lastTimerBroadcast >= Fix64.One)
         {
-            _lastBroadcastTime = _gameTimer;
+            _lastTimerBroadcast = _elapsed;
             BroadcastTimerUpdate();
         }
 
-        // 水晶定时生成
-        _crystalSpawnTimer += deltaTime;
-        if (_crystalSpawnTimer >= CrystalSpawnInterval)
+        // === 水晶生成（全程可生成，区域已初始化，且未达上限）===
+        if (_spawnZones != null && _zoneSpawnedCount < MaxZoneSpawned)
         {
-            _crystalSpawnTimer -= CrystalSpawnInterval;
-            if (_activeCrystals.Count < MaxCrystals)
+            for (int z = 0; z < _spawnZones.Length; z++)
             {
-                SpawnCrystal();
+                if (_zoneSpawnedCount >= MaxZoneSpawned) break;
+                _zoneTimers[z] += deltaTime;
+                while (_zoneTimers[z] >= ZoneSpawnInterval)
+                {
+                    _zoneTimers[z] -= ZoneSpawnInterval;
+                    SpawnCrystalInZone(z);
+                    if (_zoneSpawnedCount >= MaxZoneSpawned) break;
+                }
             }
         }
     }
-
-    /// <summary>
-    /// 广播倒计时更新给所有客户端（含房主本机）。
-    /// 注意：protobuf 的 RemainingTime 是 float，不能做确定性模拟，
-    /// 此处仅用于客户端 UI 显示，不参与游戏逻辑。
-    /// </summary>
-    private void BroadcastTimerUpdate()
-    {
-        var msg = new GameTimerUpdate { RemainingTime = _gameTimer.ToFloat() };
-        _host.BroadcastToAll(new NetMessage { GameTimerUpdate = msg });
-        EventCenter.Dispatch(36, msg);
-    }
-
-    /// <summary>获取当前剩余时间（供外部查询，返回 Fix64）</summary>
-    public Fix64 RemainingTime => _gameTimer;
 
     #endregion
 
     #region =============== 水晶生成 ===============
 
-
     /// <summary>
-    /// 生成一颗水晶并广播
-    /// ★★★ 生成位置需要根据实际地图对接 ★★★
+    /// 延迟初始化水晶生成区域（等到 GameScene 加载完成后扫描 CPS 对象）
+    /// StartGameLoop 在 LoadScene 之前调用，Tick 在场景切换期间就开始运行，
+    /// 所以需要重试直到场景中的 CPS 对象可用。
     /// </summary>
-    private void SpawnCrystal()
+    private void EnsureZonesInitialized()
     {
+        var zoneObjects = GameObject.FindObjectsOfType<CrystalSpawnZone>();
+        if (zoneObjects != null && zoneObjects.Length > 0)
+        {
+            // ★ 找到了！用场景中的 CPS 对象初始化
+            _zonesInitialized = true;
+
+            int count = Mathf.Min(zoneObjects.Length, 5);
+            _spawnZones = new SpawnZone[count];
+            for (int i = 0; i < count; i++)
+            {
+                var z = zoneObjects[i];
+                _spawnZones[i] = new SpawnZone
+                {
+                    CenterX = Fix64.FromFloat(z.Center.x),
+                    CenterY = Fix64.FromFloat(z.Center.y),
+                    CenterZ = Fix64.FromFloat(z.Center.z),
+                    Radius = Fix64.FromFloat(z.Radius),
+                };
+            }
+            Debug.Log("【GameEventHandler】已扫描 " + count + " 个水晶生成区域");
+
+            _zoneTimers = new Fix64[_spawnZones.Length];
+            for (int i = 0; i < _zoneTimers.Length; i++)
+                _zoneTimers[i] = Fix64.Zero;
+        }
+        else
+        {
+            _zoneRetryAttempts++;
+            // 最多重试 90 tick（≈3 秒 @30fps），之后降级到默认区域
+            if (_zoneRetryAttempts >= 90)
+            {
+                _zonesInitialized = true;
+                Debug.LogWarning("【GameEventHandler】场景中未找到 CrystalSpawnZone（" +
+                                _zoneRetryAttempts + " 次重试后放弃），使用默认区域");
+                _spawnZones = new SpawnZone[5];
+                for (int i = 0; i < 5; i++)
+                {
+                    _spawnZones[i] = new SpawnZone
+                    {
+                        CenterX = Fix64.FromFloat((i - 2) * 15f),
+                        CenterY = Fix64.Zero,
+                        CenterZ = Fix64.FromFloat(20f),
+                        Radius = Fix64.FromFloat(8f),
+                    };
+                }
+                _zoneTimers = new Fix64[_spawnZones.Length];
+                for (int i = 0; i < _zoneTimers.Length; i++)
+                    _zoneTimers[i] = Fix64.Zero;
+            }
+            // 否则：_zonesInitialized 保持 false，下一 Tick 继续重试
+        }
+    }
+
+    /// <summary>在指定区域内生成一颗水晶</summary>
+    private void SpawnCrystalInZone(int zoneIndex)
+    {
+        if (zoneIndex < 0 || zoneIndex >= _spawnZones.Length) return;
+
         int crystalId = _nextCrystalId++;
+        _zoneSpawnedCount++;  // ★ 累计区域生成数（只算区域，不算死亡掉落）
+        var zone = _spawnZones[zoneIndex];
 
-        // TODO：替换为实际地图的水晶生成点
-        //float posX = 
-        //float posY = 
-        //float posZ = 
+        // 确定性随机：在圆形区域内随机位置
+        Fix64 angle = _rng.NextFix64() * Fix64.TwoPi;
+        // dist = R * sqrt(rand)  — 面积均匀分布
+        Fix64 dist = zone.Radius * Fix64.Sqrt(_rng.NextFix64());
+        Fix64 posX = zone.CenterX + dist * Fix64.Cos(angle);
+        Fix64 posZ = zone.CenterZ + dist * Fix64.Sin(angle);
+        // 地面高度：使用生成区域的实际 Y 坐标
+        Fix64 posY = zone.CenterY;
 
+        // 存储
         _activeCrystals[crystalId] = new CrystalData
         {
             CrystalId = crystalId,
-            //PosX = 
-            //PosY = 
-            //PosZ = 
+            PosX = posX,
+            PosY = posY,
+            PosZ = posZ,
+        };
+
+        // 广播
+        var msg = new CrystalSpawn
+        {
+            CrystalId = crystalId,
+            PosX = posX.Raw,
+            PosY = posY.Raw,
+            PosZ = posZ.Raw,
+        };
+        _host.BroadcastToAll(new NetMessage { CrystalSpawn = msg });
+        // ★ 主机本地也需要创建水晶 GameObject
+        EventCenter.Dispatch(30, msg);
+    }
+
+    /// <summary>在指定位置生成水晶（用于死亡掉落）</summary>
+    private void SpawnCrystalAt(Fix64 posX, Fix64 posY, Fix64 posZ)
+    {
+        int crystalId = _nextCrystalId++;
+        _activeCrystals[crystalId] = new CrystalData
+        {
+            CrystalId = crystalId,
+            PosX = posX,
+            PosY = posY,
+            PosZ = posZ,
         };
 
         var msg = new CrystalSpawn
         {
             CrystalId = crystalId,
-            //PosX = 
-            //PosY = 
-            //PosZ = 
+            PosX = posX.Raw,
+            PosY = posY.Raw,
+            PosZ = posZ.Raw,
         };
-
         _host.BroadcastToAll(new NetMessage { CrystalSpawn = msg });
+        // ★ 主机本地也需要创建水晶 GameObject
+        EventCenter.Dispatch(30, msg);
     }
 
     #endregion
 
-    #region ==================== 事件处理 ====================
+    #region =============== 广播消息 ===============
 
+    private void BroadcastTimerUpdate()
+    {
+        Fix64 remaining = GameDuration - _elapsed;
+        if (remaining.Raw < 0) remaining = Fix64.Zero;
+        var msg = new GameTimerUpdate { RemainingTime = remaining.ToFloat() };
+        _host.BroadcastToAll(new NetMessage { GameTimerUpdate = msg });
+        EventCenter.Dispatch(36, msg);
+    }
+
+    #endregion
+
+    #region =============== 事件处理 ===============
 
     /// <summary>
     /// 处理水晶拾取（客户端上报，服务端验证后广播权威结果）
@@ -239,68 +346,65 @@ public class GameEventHandler
         int playerId = request.PlayerId;
 
         if (!_activeCrystals.ContainsKey(crystalId)) return;
-        if (!_playerScores.ContainsKey(playerId)) return;
+        if (!_playerHoldings.ContainsKey(playerId)) return;
 
         // 移除水晶
         _activeCrystals.Remove(crystalId);
 
-        // 加分
-        _playerScores[playerId]++;
+        // 加持有数 → 分数 = 持有数 × 6
+        _playerHoldings[playerId]++;
+        int newScore = _playerHoldings[playerId] * CrystalScoreValue;
 
-        // 广播权威结果（包含 new_score）
+        // 广播权威结果
         var pickup = new CrystalPickup
         {
             CrystalId = crystalId,
             PlayerId = playerId,
-            NewScore = _playerScores[playerId]
+            NewScore = newScore,
         };
         _host.BroadcastToAll(new NetMessage { CrystalPickup = pickup });
+        // ★ 主机本地也需要处理拾取（移除水晶 + 更新分数）
+        EventCenter.Dispatch(31, pickup);
 
-        Debug.Log("【GameEventHandler】玩家" + playerId + "拾取水晶" + crystalId + " 分数：" + _playerScores[playerId]);
-
-        // 检查胜利
-        if (_playerScores[playerId] >= _winScore)
-            // 结束游戏
-            EndGame(playerId);
-
+        Debug.Log(string.Format("【GameEventHandler】玩家{0}拾取水晶{1} 持有{2} 分数={3}",
+            playerId, crystalId, _playerHoldings[playerId], newScore));
     }
 
-    /// <summary>
-    /// 处理玩家受击
-    /// </summary>
-    /// <param name="request"></param>
+    /// <summary>处理玩家受击</summary>
     public void HandlePlayerHit(PlayerHit request)
     {
         int attackId = request.AttackerId;
         int victimId = request.VictimId;
-        int droppedCount = request.DroppedCount; //晶石掉落数量
+        int droppedCount = request.DroppedCount;
 
         if (!_playerHPs.ContainsKey(victimId)) return;
 
-        // 扣血
         _playerHPs[victimId]--;
 
-        // 掉落晶石 -> 扣分
-        _playerScores[victimId] = Mathf.Max(0, _playerScores[victimId] - droppedCount);
+        // 掉落晶石 → 扣持有数
+        if (_playerHoldings.ContainsKey(victimId))
+        {
+            _playerHoldings[victimId] = Mathf.Max(0, _playerHoldings[victimId] - droppedCount);
+        }
 
-        // 广播权威结果
         var hit = new PlayerHit
         {
             AttackerId = attackId,
             VictimId = victimId,
-            DroppedCount = droppedCount
+            DroppedCount = droppedCount,
         };
         _host.BroadcastToAll(new NetMessage { PlayerHit = hit });
+        // ★ 主机本地也需要处理受击（更新 HP + 分数）
+        EventCenter.Dispatch(32, hit);
 
         Debug.Log("【GameEventHandler】玩家" + victimId + "受击 掉落" + droppedCount +
-                  "颗 HP：" + _playerHPs[victimId]);
+                  "颗 HP:" + _playerHPs[victimId]);
 
-        // 检查淘汰
         if (_playerHPs[victimId] <= 0)
-            // 淘汰玩家
-            HandlePlayerEliminated(victimId, attackId);
+            HandlePlayerDeath(victimId, attackId);
     }
 
+    /// <summary>处理玩家坠落</summary>
     public void HandlePlayerFall(PlayerFall request)
     {
         int playerId = request.PlayerId;
@@ -308,154 +412,227 @@ public class GameEventHandler
 
         if (!_playerHPs.ContainsKey(playerId)) return;
 
-        // 扣血
         _playerHPs[playerId]--;
 
-        // 掉落全部晶石 -> 扣分
-        _playerScores[playerId] = Mathf.Max(0, _playerScores[playerId] - droppedCount);
+        if (_playerHoldings.ContainsKey(playerId))
+        {
+            _playerHoldings[playerId] = Mathf.Max(0, _playerHoldings[playerId] - droppedCount);
+        }
 
-        // 广播权威结果
         var fall = new PlayerFall
         {
             PlayerId = playerId,
-            DroppedCount = droppedCount
+            DroppedCount = droppedCount,
         };
         _host.BroadcastToAll(new NetMessage { PlayerFall = fall });
+        // ★ 主机本地也需要处理坠落（更新 HP + 分数）
+        EventCenter.Dispatch(33, fall);
 
         Debug.Log("【GameEventHandler】玩家" + playerId + "坠落 掉落" + droppedCount +
-          "颗 HP：" + _playerHPs[playerId]);
+                  "颗 HP:" + _playerHPs[playerId]);
 
         if (_playerHPs[playerId] <= 0)
-            HandlePlayerEliminated(playerId, -1);
-
+            HandlePlayerDeath(playerId, -1);
     }
 
-    /// <summary>
-    /// 处理玩家重生（坠落后重新站起，HP已在HandlePlayerFall中扣除）
-    /// </summary>
+    /// <summary>玩家重生请求验证</summary>
     public void HandlePlayerRespawn(PlayerRespawn request)
     {
         int playerId = request.PlayerId;
-
-        // 校验：玩家是否存在
         if (!_playerHPs.ContainsKey(playerId)) return;
-
-        // 校验：HP <= 0 已被淘汰，不能重生
         if (_playerHPs[playerId] <= 0) return;
 
-        // 广播权威重生结果（HP已在HandlePlayerFall中扣过，这里不动HP）
         var respawn = new PlayerRespawn
         {
             PlayerId = playerId,
             PosX = request.PosX,
             PosY = request.PosY,
-            PosZ = request.PosZ
+            PosZ = request.PosZ,
         };
         _host.BroadcastToAll(new NetMessage { PlayerRespawn = respawn });
-
-        Debug.Log("【GameEventHandler】玩家" + playerId + "重生 剩余HP：" + _playerHPs[playerId]);
+        // ★ 主机本地也需要处理重生（移动玩家到出生点）
+        EventCenter.Dispatch(35, respawn);
+        Debug.Log("【GameEventHandler】玩家" + playerId + "重生 剩余HP:" + _playerHPs[playerId]);
     }
-
-
 
     #endregion
 
-    #region =============== 淘汰与结算 ===============
+    #region =============== 死亡与重生 ===============
 
     /// <summary>
-    /// 处理淘汰玩家
+    /// 处理玩家死亡：计算掉落、扣持有数、生成掉落水晶、触发重生
     /// </summary>
-    /// <param name="eliminatedId"></param>
-    /// <param name="killerId"></param>
-    private void HandlePlayerEliminated(int eliminatedId, int killerId)
+    private void HandlePlayerDeath(int playerId, int killerId)
     {
-        Debug.Log("【GameEventHandler】玩家" + eliminatedId + "被淘汰" + (killerId > 0 ? " 击杀者：" + killerId : "跌落死亡"));
+        Debug.Log("【GameEventHandler】玩家" + playerId + "死亡" +
+                  (killerId > 0 ? " 击杀者:" + killerId : " 跌落死亡"));
 
-        // 检查是否只剩一人
-        int aliveCount = 0;
-        int lastAliveId = -1;
-
-        foreach (var kvp in _playerHPs)
+        // --- 计算掉落 ---
+        int holding = _playerHoldings.TryGetValue(playerId, out int h) ? h : 0;
+        int dropCount = 0;
+        if (holding > 0)
         {
-            if (kvp.Value > 0)
+            // ceil(holding × 0.3)
+            Fix64 holdingFix = Fix64.FromInt(holding);
+            Fix64 dropFix = holdingFix * DropRatio;
+            dropCount = dropFix.Ceil().ToInt();
+            if (dropCount > holding) dropCount = holding;
+        }
+
+        // --- 扣持有数 ---
+        _playerHoldings[playerId] = Mathf.Max(0, holding - dropCount);
+        int newScore = _playerHoldings[playerId] * CrystalScoreValue;
+
+        // --- 在死亡位置生成掉落水晶 ---
+        Vector3 deathPos = _playerLastPos.TryGetValue(playerId, out Vector3 dp)
+            ? dp : Vector3.zero;
+        // 微偏移避免重叠
+        float scatterRadius = 1.5f;
+        for (int i = 0; i < dropCount; i++)
+        {
+            float angleVal = (float)(_rng.Next(0, 1000) / 1000.0 * 2.0 * 3.1415926535);
+            float scatter = (float)(_rng.Next(0, 1000) / 1000.0) * scatterRadius;
+            float dxFloat = deathPos.x + Mathf.Cos(angleVal) * scatter;
+            float dzFloat = deathPos.z + Mathf.Sin(angleVal) * scatter;
+            Fix64 dx = Fix64.FromFloat(dxFloat);
+            Fix64 dy = Fix64.FromFloat(deathPos.y);
+            Fix64 dz = Fix64.FromFloat(dzFloat);
+            SpawnCrystalAt(dx, dy, dz);
+        }
+
+        // --- 广播 CrystalDrop 事件 ---
+        var dropMsg = new CrystalDrop
+        {
+            Count = dropCount,
+            PlayerId = playerId,
+            NewScore = newScore,
+        };
+        _host.BroadcastToAll(new NetMessage { CrystalDrop = dropMsg });
+        // ★ 主机本地也需要处理掉落事件（更新分数）
+        EventCenter.Dispatch(39, dropMsg);
+
+        // --- 重生：重置HP，回到出生点 ---
+        _playerHPs[playerId] = InitialHP;
+        Vector3 birthPos = _playerBirthPos.TryGetValue(playerId, out Vector3 bp)
+            ? bp : Vector3.zero;
+
+        var respawn = new PlayerRespawn
+        {
+            PlayerId = playerId,
+            PosX = Fix64.FromFloat(birthPos.x).Raw,
+            PosY = Fix64.FromFloat(birthPos.y).Raw,
+            PosZ = Fix64.FromFloat(birthPos.z).Raw,
+        };
+        _host.BroadcastToAll(new NetMessage { PlayerRespawn = respawn });
+        // ★ 主机本地也需要处理重生（移动玩家到出生点）
+        EventCenter.Dispatch(35, respawn);
+
+        Debug.Log(string.Format("【GameEventHandler】玩家{0}掉落{1}颗（持有{2}→{3}）分数={4} 重生HP={5}",
+            playerId, dropCount, holding, _playerHoldings[playerId], newScore, InitialHP));
+    }
+
+    #endregion
+
+    #region =============== 结算 ===============
+
+    /// <summary>时间结束：按分数决定胜者</summary>
+    private void OnTimerEnd()
+    {
+        Debug.Log("【GameEventHandler】时间结束，按分数决定胜者");
+
+        int maxScore = -1;
+        var winners = new List<int>();
+
+        foreach (var kvp in _playerHoldings)
+        {
+            int score = kvp.Value * CrystalScoreValue;
+            if (score > maxScore)
             {
-                aliveCount++;
-                lastAliveId = kvp.Key;
+                maxScore = score;
+                winners.Clear();
+                winners.Add(kvp.Key);
+            }
+            else if (score == maxScore)
+            {
+                winners.Add(kvp.Key);
             }
         }
 
-        if (aliveCount <= 1)
-            EndGame(lastAliveId);
+        if (winners.Count == 0) { EndGame(-1); return; }
 
-    }
-
-    private void EndGame(int winnerId)
-    {
-        Debug.Log("【GameEventHandler】游戏结束 胜者：" + winnerId);
-
-        // 查找胜者名字
+        // 找胜者名（并列取第一个的名称，或拼接）
+        int winnerId = winners[0];
         string winnerName = "未知";
         var room = _host.CurrentRoom;
         if (room != null && room.IdToPlayer.TryGetValue(winnerId, out var player))
-        {
             winnerName = player.PlayerName;
-        }
+        if (winners.Count > 1) winnerName += " 等" + winners.Count + "人并列";
 
         var gameEnd = new GameEnd { WinnerId = winnerId, WinnerName = winnerName };
 
-        // scores：按 playerId 从 1 开始依次添加
         if (room != null)
         {
-            foreach (int playerId in room.GetAllPlayerIds())
+            foreach (int pid in room.GetAllPlayerIds())
             {
-                int score = _playerScores.TryGetValue(playerId, out int s) ? s : 0;
+                int score = _playerHoldings.TryGetValue(pid, out int hld) ? hld * CrystalScoreValue : 0;
                 gameEnd.Scores.Add(score);
             }
         }
 
-        // 1.发给远程客户端
         _host.BroadcastToAll(new NetMessage { GameEnd = gameEnd });
-        // 2.房主本机也收到
         EventCenter.Dispatch(34, gameEnd);
-
         _isRunning = false;
         _host.OnGameEnded();
     }
 
-    /// <summary>
-    /// 倒计时结束：按分数决定胜者
-    /// </summary>
-    private void OnTimerEnd()
+    private void EndGame(int winnerId)
     {
-        Debug.Log("【GameEventHandler】倒计时结束，按分数决定胜者");
-
-        // 找出得分最高的玩家
-        int winnerId = -1;
-        int maxScore = -1;
-
-        foreach (var kvp in _playerScores)
-        {
-            if (kvp.Value > maxScore)
-            {
-                maxScore = kvp.Value;
-                winnerId = kvp.Key;
-            }
-        }
-
-        // 没有玩家时默认-1
-        EndGame(winnerId);
+        // OnTimerEnd 已处理，此处保留兼容
+        OnTimerEnd();
     }
 
     #endregion
 
-    #region =============== 查询 ===============
+    #region =============== 外部接口（供 Lua 调用）===============
 
+    /// <summary>设置玩家出生点（Lua 在 SpawnAllPlayers 时调用）</summary>
+    public void SetPlayerBirthPos(int playerId, float x, float y, float z)
+    {
+        _playerBirthPos[playerId] = new Vector3(x, y, z);
+    }
+
+    /// <summary>报告玩家位置（Lua 每帧调用，用于死亡掉落位置）</summary>
+    public void ReportPlayerPosition(int playerId, float x, float y, float z)
+    {
+        _playerLastPos[playerId] = new Vector3(x, y, z);
+    }
+
+    /// <summary>设置玩家初始持有数（Lua 调用，通常为0）</summary>
+    public void SetPlayerHolding(int playerId, int holding)
+    {
+        _playerHoldings[playerId] = holding;
+    }
+
+    /// <summary>获取玩家持有数</summary>
+    public int GetPlayerHolding(int playerId)
+        => _playerHoldings.TryGetValue(playerId, out int h) ? h : 0;
+
+    /// <summary>获取玩家分数（持有数×6）</summary>
     public int GetPlayerScore(int playerId)
-        => _playerScores.TryGetValue(playerId, out int s) ? s : 0;
+        => GetPlayerHolding(playerId) * CrystalScoreValue;
 
+    /// <summary>获取玩家 HP</summary>
     public int GetPlayerHP(int playerId)
-        => _playerHPs.TryGetValue(playerId, out int h) ? h : 0;
+        => _playerHPs.TryGetValue(playerId, out int hp) ? hp : 0;
+
+    /// <summary>全程可攻击（无阶段限制）</summary>
+    public bool CanAttack => _isRunning;
+
+    /// <summary>全程可生成水晶（受 45 颗上限限制）</summary>
+    public bool CrystalsSpawning => _isRunning;
+
+    /// <summary>游戏是否运行中</summary>
+    public bool IsRunning => _isRunning;
 
     #endregion
 }
-// TODO 水晶生成位置待处理 205-222

@@ -61,9 +61,10 @@ local function run()
     -- ===== M6: 蓄力计时归零 =====
     local chargeTime = 0
     local attackHeld = true
-    -- 按住期间累积
-    for _ = 1, 30 do  -- 2 秒 @ 15fps
-        chargeTime = chargeTime + 1/15
+    -- 按住期间累积（2 秒）
+    local ticksFor2s = math.floor(2 / GC.TICK_INTERVAL)
+    for _ = 1, ticksFor2s do
+        chargeTime = chargeTime + GC.TICK_INTERVAL
     end
     TF.assertInRange(chargeTime, 1.9, 2.1, "M6-蓄力2s≈2.0")
     -- 松开

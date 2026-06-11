@@ -29,7 +29,9 @@ public class DeterministicRandom
     /// <summary>返回 [0.0, 1.0) 的定点数</summary>
     public Fix64 NextFix64()
     {
-        return Fix64.FromFraction(NextUInt(), uint.MaxValue);
+        // ★ FromFraction(n, uint.MaxValue) 当 n > 2147483647 时长乘法溢出
+        //    改用 double 中间量规避
+        return Fix64.FromDouble((double)NextUInt() / uint.MaxValue);
     }
 
     private uint NextUInt()

@@ -19,6 +19,7 @@ public class GameMgr : MonoBehaviour
     }
 
     private XLua.LuaFunction luaUpdate;
+    private XLua.LuaFunction luaLateUpdate;
     private XLua.LuaFunction luaOnSceneLoaded;
 
     void Awake()
@@ -48,6 +49,7 @@ public class GameMgr : MonoBehaviour
         // 获取Lua侧函数引用
         luaOnSceneLoaded = LuaMgr.Instance.Global.Get<XLua.LuaFunction>("OnSceneLoaded");
         luaUpdate = LuaMgr.Instance.Global.Get<XLua.LuaFunction>("Update");
+        luaLateUpdate = LuaMgr.Instance.Global.Get<XLua.LuaFunction>("LateUpdate");
 
         // 注册场景加载回调（切场景时自动调用Lua侧OnSceneLoaded）
         SceneManager.sceneLoaded += OnSceneLoadedCallback;
@@ -81,6 +83,16 @@ public class GameMgr : MonoBehaviour
             _luaGCTimer -= 1.0f;
             LuaMgr.Instance.Tick();
         }
+    }
+
+    /// <summary>
+    /// LateUpdate：在所有 Update 之后调用，用于渲染层（插值/摄像机）
+    ///   确保物理回退（TickExecutor.Update）已完成，插值读到正确的 prevPos/targetPos
+    /// </summary>
+    void LateUpdate()
+    {
+        if (luaLateUpdate != null)
+            luaLateUpdate.Action(Time.deltaTime);
     }
 
     void OnDestroy()

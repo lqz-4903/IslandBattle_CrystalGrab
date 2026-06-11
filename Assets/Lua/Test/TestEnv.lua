@@ -35,12 +35,17 @@ function TestEnv.Setup()
     CS.UnityEngine.GameObject.DontDestroyOnLoad(TestEnv.rootGO)
     TestEnv.rootGO.transform.position = CS.UnityEngine.Vector3.zero
 
-    -- 地面（大平面，确保玩家不会走出边界）
-    TestEnv.groundGO = CS.UnityEngine.GameObject.CreatePrimitive(CS.UnityEngine.PrimitiveType.Plane)
-    TestEnv.groundGO.name = "__TestGround__"
+    -- 地面（BoxCollider，确保 CharacterController 不会穿透）
+    --   ★ Plane 的 MeshCollider 与 CharacterController 配合不好，CC 会穿透
+    --   BoxCollider 更可靠：顶部表面在 y=groundY
+    --   ★ groundY = CC底部(0.35) - skinWidth(0.08) = 0.27
+    --     这样 CC 有效底部恰好在地面表面，isGrounded=true，且不会嵌入
+    local groundY = 0.27
+    TestEnv.groundGO = CS.UnityEngine.GameObject("__TestGround__")
     TestEnv.groundGO.transform:SetParent(TestEnv.rootGO.transform)
-    TestEnv.groundGO.transform.position = CS.UnityEngine.Vector3(0, -0.05, 0)
-    TestEnv.groundGO.transform.localScale = CS.UnityEngine.Vector3(10, 1, 10)  -- 100m²
+    TestEnv.groundGO.transform.position = CS.UnityEngine.Vector3(0, groundY - 5, 0)
+    local boxCol = TestEnv.groundGO:AddComponent(typeof(CS.UnityEngine.BoxCollider))
+    boxCol.size = CS.UnityEngine.Vector3(200, 10, 200)
 
     TestEnv._createdPlayers = {}
     print("[TestEnv] 环境搭建完成")
@@ -75,7 +80,8 @@ end
 
 -- 常用测试出生点（避免所有测试挤在原点）
 TestEnv.SPAWN = {
-    -- ★ Y=0.35：CC 底端(center.y-height/2-radius=0.9-0.9-0.4=-0.4) 刚好在 y=-0.05 地平面
+    -- ★ Y=0.35：CC 底端 = transform.y + center.y - height/2 = 0.35+0.9-0.9 = 0.35
+    --   地面 y=0.27 = CC底部(0.35) - skinWidth(0.08)，CC 有效底部恰好在地面
     ORIGIN   = CS.UnityEngine.Vector3(0, 0.35, 0),
     FAR      = CS.UnityEngine.Vector3(50, 0.35, 50),
     AIR      = CS.UnityEngine.Vector3(0, 5, 0),           -- 空中（测试跳跃/坠落）
@@ -113,9 +119,9 @@ function TestEnv.CreateTestPlayer(playerId, playerName, isLocal, spawnPos, yawDe
     cc.stepOffset = 0.3
     cc.slopeLimit = 45
 
-    -- ★ 地面沉降：调用一次小位移 Move 让 PhysX 将 CC 精确放置到地面上
-    --   避免首 tick 因 CC 离地导致 isGrounded=false 而意外坠落
-    pcall(function() cc:Move(CS.UnityEngine.Vector3(0, -0.001, 0)) end)
+    -- ★ 地面沉降：Move 足够大的负位移让 PhysX 将 CC 精确放置到地面上
+    --   间距 0.05m + skinWidth 0.08m，需要 >0.05m 才能触发地面碰撞
+    pcall(function() cc:Move(CS.UnityEngine.Vector3(0, -0.1, 0)) end)
 
     -- 创建 PlayerEntity
     local player = PlayerEntity.new(playerId, playerName, isLocal)
@@ -124,7 +130,9 @@ function TestEnv.CreateTestPlayer(playerId, playerName, isLocal, spawnPos, yawDe
     player.controller = cc
     player:SetPosition(Fix64.fromFloat(spawnPos.x), Fix64.fromFloat(spawnPos.y), Fix64.fromFloat(spawnPos.z))
     player:SetYaw(Fix64.fromFloat(math.rad(yawDeg)))
-    player.isGrounded = (spawnPos.y < 1.0)  -- 贴地则着地
+    -- ★ 着地状态从 PhysX 实际状态读取，不用静态启发式
+    local okGnd, grounded = pcall(function() return cc.isGrounded end)
+    player.isGrounded = okGnd and grounded or (spawnPos.y < 1.0)
 
     -- 记录以便清理
     local entry = { playerEntity = player, gameObject = go, controller = cc }
@@ -196,7 +204,7 @@ end
 function TestEnv.ExecDeterministicMove(player)
     local PlayerManager = require("Core.PlayerManager")
     local pm = PlayerManager.GetInstance()
-    local tickDt = Fix64.fromFloat(1/15)
+    local tickDt = Fix64.fromFloat(GC.TICK_INTERVAL)
 
     -- 确保插值状态已初始化
     if pm._InitInterpState then

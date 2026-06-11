@@ -408,6 +408,26 @@ public class HostServer : MonoBehaviour
         _gameEventHandler.HandleCrystalPickup(msg as CrystalPickup);
     }
 
+    /// <summary>主机玩家本地水晶拾取（不走网络）</summary>
+    public void SubmitHostCrystalPickup(int crystalId, int playerId)
+    {
+        if (!_isRunning || !_isGameStarted) return;
+        var pickup = new CrystalPickup { CrystalId = crystalId, PlayerId = playerId };
+        _gameEventHandler.HandleCrystalPickup(pickup);
+    }
+
+    /// <summary>Lua 侧在生成玩家时报告出生点（供死亡重生用）</summary>
+    public void SetPlayerBirthPos(int playerId, float x, float y, float z)
+    {
+        _gameEventHandler.SetPlayerBirthPos(playerId, x, y, z);
+    }
+
+    /// <summary>Lua 侧每帧报告玩家位置（供死亡掉落水晶定位用）</summary>
+    public void ReportPlayerPosition(int playerId, float x, float y, float z)
+    {
+        _gameEventHandler.ReportPlayerPosition(playerId, x, y, z);
+    }
+
     private void OnPlayerHit(uint conv, IMessage msg)
     {
         if (!_isRunning || !_isGameStarted) return;
@@ -607,7 +627,7 @@ public class HostServer : MonoBehaviour
             RandomSeed = randomSeed,
             GameDuration = gameDuration,
             TargetScore = 10,
-            TickRate = 15
+            TickRate = 30
         };
         _roomHandler.HandleGameStart(RoomData.HostConv, request);
     }
