@@ -229,7 +229,8 @@ public class TickSyncHandler
                     Attack = false,
                     Skill = false,
                     CameraYaw = 0L,
-                    ChargeTime = 0L
+                    ChargeTime = 0L,
+                    CameraPitch = 0L
                 };
             }
 
@@ -283,10 +284,10 @@ public class TickSyncHandler
     /// <param name="cameraYaw"></param>
     /// <param name="chargeTime"></param>
     /// <summary>
-    /// 主机玩家提交本地输入。cameraYaw/chargeTime 已由调用方转为 Fix64。
+    /// 主机玩家提交本地输入。cameraYaw/chargeTime/cameraPitch 已由调用方转为 Fix64。
     /// ★ Proto 改为 sfixed64 后直接传 Fix64.Raw（long），不再丢失精度。
     /// </summary>
-    public void SubmitLocalInput(int playerId, uint moveDir, bool jump, bool attack, bool skill, Fix64 cameraYaw, Fix64 chargeTime)
+    public void SubmitLocalInput(int playerId, uint moveDir, bool jump, bool attack, bool skill, Fix64 cameraYaw, Fix64 chargeTime, Fix64 cameraPitch)
     {
         if (!_isRunning || !_isWaitingForInput) return;
         if (!_activePlayers.Contains(playerId)) return;
@@ -300,7 +301,8 @@ public class TickSyncHandler
             Attack = attack,
             Skill = skill,
             CameraYaw = cameraYaw.Raw,
-            ChargeTime = chargeTime.Raw
+            ChargeTime = chargeTime.Raw,
+            CameraPitch = cameraPitch.Raw
         };
     }
 

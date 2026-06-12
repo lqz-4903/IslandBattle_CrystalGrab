@@ -46,6 +46,8 @@ local groups = {
     { name = "Z2-阶段状态机",    mod = "Test.GroupZ2_PhaseLogic" },
     { name = "Z3-水晶边界异常",  mod = "Test.GroupZ3_CrystalEdge" },
     { name = "Z4-水晶集成场景",  mod = "Test.GroupZ4_CrystalIntegration" },
+    -- ★ 箭矢系统（Phase 1）
+    { name = "AA-箭矢系统",      mod = "Test.GroupAA_Arrow" },
 }
 
 local TestRunner = {}

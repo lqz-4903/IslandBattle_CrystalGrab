@@ -90,4 +90,11 @@ GC.KEYCODE = {
     RELOAD = CS.UnityEngine.KeyCode.R,
 }
 
+-- ========== 箭矢参数 ==========
+GC.ARROW_SPEED      = 80        -- 飞行速度 (m/s)
+GC.ARROW_LIFETIME   = 2.0       -- 存活时间 (秒)
+GC.ARROW_POOL_SIZE  = 20        -- 对象池预加载数量
+GC.ARROW_POOL_AB    = "player"  -- AB 包名
+GC.ARROW_POOL_RES   = "ArrowDefault"  -- 资源名
+
 return GC

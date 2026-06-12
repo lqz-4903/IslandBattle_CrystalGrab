@@ -31,10 +31,12 @@ InputHandler.cameraPitch = 0
 InputHandler.moveDir     = GC.MOVE_NONE
 InputHandler.jumpPressed   = false
 InputHandler.attackHeld    = false
+InputHandler.firePressed   = false  -- ★ 左键按下粘滞（单发箭矢）
 InputHandler.skillPressed  = false
 InputHandler.rollPressed   = false
 InputHandler.reloadPressed = false
 InputHandler.chargeTime    = 0   -- 蓄力累计（秒）
+InputHandler._attackWasHeldThisTickWindow = false  -- ★ 30fps tick 窗口内 attackHeld 是否曾为 true
 
 -- 鼠标增量（本帧累计）
 InputHandler._mouseDeltaX = 0
@@ -54,6 +56,7 @@ function InputHandler:Init()
     self.moveDir     = GC.MOVE_NONE
     self.jumpPressed   = false
     self.attackHeld    = false
+    self.firePressed   = false
     self.skillPressed  = false
     self.rollPressed   = false
     self.reloadPressed = false
@@ -61,6 +64,7 @@ function InputHandler:Init()
     self._mouseDeltaX = 0
     self._mouseDeltaY = 0
     self._isCharging  = false
+    self._attackWasHeldThisTickWindow = false
     self:LockCursor()
     print("[InputHandler] 初始化完成")
 end
@@ -108,6 +112,14 @@ function InputHandler:Update(dt)
         self.jumpPressed = true
     end
     self.attackHeld    = CS.UnityEngine.Input.GetMouseButton(0)     -- 鼠标左键（持续按住，不需粘滞）
+    -- ★ 左键按下粘滞标记（单发箭矢，问题 8）
+    if CS.UnityEngine.Input.GetMouseButtonDown(0) then
+        self.firePressed = true
+    end
+    -- ★ tick 窗口粘滞：30fps 采样前 attackHeld 是否曾为 true（防止极速点击丢失，问题 8）
+    if self.attackHeld then
+        self._attackWasHeldThisTickWindow = true
+    end
     if CS.UnityEngine.Input.GetMouseButtonDown(1) then
         self.skillPressed = true
     end
@@ -150,22 +162,30 @@ end
 
 --- 获取当前帧的标准化输入，并重置瞬发动作（jump/skill）
 --- 调用频率：逻辑帧率（30fps）
+--- ★ GC优化：复用缓存的 table 而非每次 new {}
 --- @return table {moveDir, jump, attack, skill, cameraYaw, chargeTime}
 function InputHandler:GetTickInput()
-    local input = {
-        moveDir    = self.moveDir,
-        jump       = self.jumpPressed,
-        attack     = self.attackHeld,
-        skill      = self.skillPressed,
-        cameraYaw  = self.cameraYaw,
-        chargeTime = self.chargeTime,
-    }
+    -- 首次调用时创建缓存表，后续原地更新字段（避免每 tick new table）
+    if self._tickInput == nil then
+        self._tickInput = {}
+    end
+    local input = self._tickInput
+    input.moveDir    = self.moveDir
+    input.jump       = self.jumpPressed
+    -- ★ 使用 tick 窗口粘滞：本 tick 窗口内 attackHeld 曾为 true 或当前为 true 时，Attack=true
+    input.attack     = self._attackWasHeldThisTickWindow or self.attackHeld
+    input.skill      = self.skillPressed
+    input.cameraYaw  = self.cameraYaw
+    input.chargeTime = self.chargeTime
+    input.firePressed = self.firePressed  -- ★ 单发箭矢标记
 
     -- 重置瞬发动作（避免同一动作被多帧重复发送）
     self.jumpPressed   = false
     self.skillPressed  = false
     self.rollPressed   = false
     self.reloadPressed = false
+    self.firePressed   = false                     -- ★ 消费
+    self._attackWasHeldThisTickWindow = false      -- ★ 消费
 
     -- 重置蓄力（松开攻击键后下一帧归零）
     if not self.attackHeld then

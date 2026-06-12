@@ -24,6 +24,10 @@ local InputHandler = require("Battle.InputHandler")
 local PlayerManager = require("Core.PlayerManager")
 local NetworkEventMgr = require("Core.NetworkEventMgr")
 local CrystalManager = require("Battle.CrystalManager")
+local Arrow = require("Battle.Arrow")
+
+-- ★ GC优化：预缓存 table.sort 比较函数，避免每次 reconciliation 创建闭包
+local function _sortByTick(a, b) return a.tick < b.tick end
 
 local PlayerController = {}
 PlayerController.__index = PlayerController
@@ -76,6 +80,7 @@ function PlayerController:Init(playerId, isHost)
 
     -- 客户端预测-校正：重置输入缓冲
     self._inputBuffer = {}
+    self._bufPool = {}           -- ★ GC优化：table 复用池
     self._nextSendTick = 1
     self._lastAckedTick = 0
 
@@ -113,6 +118,7 @@ function PlayerController:Shutdown()
     end
     self.initialized = false
     self._inputBuffer = {}
+    self._bufPool = {}
     self._nextSendTick = 1
     self._lastAckedTick = 0
     InputHandler:UnlockCursor()
@@ -308,6 +314,7 @@ function PlayerController:_SubmitHostInput(input)
     -- 将 Lua float 转为 Fix64.Raw（long），消除 float→Fix64→float 往返精度丢失
     local yawRaw   = CS.Fix64.FromFloat(input.cameraYaw).Raw
     local chargeRaw = CS.Fix64.FromFloat(input.chargeTime).Raw
+    local pitchRaw = CS.Fix64.FromFloat(InputHandler.cameraPitch).Raw
 
     -- ★ 翻滚编码到 MoveDir 的 bit 4（不修改 proto）
     local moveDir = input.moveDir
@@ -321,7 +328,8 @@ function PlayerController:_SubmitHostInput(input)
         input.attack,
         input.skill,
         yawRaw,
-        chargeRaw
+        chargeRaw,
+        pitchRaw
     )
 end
 
@@ -349,17 +357,25 @@ function PlayerController:_SubmitClientInput(input)
     playerInput.MoveDir = moveDir
 
     -- ★ 客户端预测-校正：缓存输入供回滚重放（含翻滚标记）
-    self._inputBuffer[clientTick] = {
-        moveDir = moveDir,
-        yaw     = input.cameraYaw,
-        jump    = input.jump,
-    }
+    --    GC优化：复用 _bufPool 中的 table，避免每个 tick new {}
+    -- ★ 修复 Bug2：key 应使用 clientTick（与 _inputBuffer 一致），而非已递增的 _nextSendTick。
+    --   旧代码 _bufPool[_nextSendTick] 导致池 key 偏移 1，table 永远无法复用。
+    local entry = self._bufPool[clientTick]
+    if entry == nil then
+        entry = {}
+        self._bufPool[clientTick] = entry
+    end
+    entry.moveDir = moveDir
+    entry.yaw     = input.cameraYaw
+    entry.jump    = input.jump
+    self._inputBuffer[clientTick] = entry
     self:_TrimInputBuffer()
     playerInput.Jump = input.jump
     playerInput.Attack = input.attack
     playerInput.Skill = input.skill
     playerInput.CameraYaw = yawRaw        -- long (Fix64.Raw)
     playerInput.ChargeTime = chargeRaw    -- long (Fix64.Raw)
+    playerInput.CameraPitch = CS.Fix64.FromFloat(InputHandler.cameraPitch).Raw  -- long (Fix64.Raw)
 
     -- 打包到 NetMessage 并发送
     local envelope = CS.GameProto.NetMessage()
@@ -370,14 +386,26 @@ end
 -- ========== 攻击处理 ==========
 
 --- 处理攻击/射击（每帧调用，attackHeld 为 true 时）
+--- ★ Phase 1：箭矢发射（纯视觉飞行，无碰撞检测）
+---   - firePressed 触发：从摄像机位置发射 ArrowDefault（本地即时预览）
+---   - 远程玩家通过 PlayerEntity.ApplyInput 上升沿 → FireNetworked 生成
 function PlayerController:_ProcessAttack(dt)
     -- 仅在攻击阶段可以攻击
     if not NetworkEventMgr._canAttack then return end
 
-    -- TODO: 实现射击逻辑（后续单独实现）
-    -- 1. 从摄像机中心做射线检测
-    -- 2. 命中其他玩家 → 上报 PlayerHit 到服务端
-    -- 3. 播放枪口特效/音效
+    -- ★ 死亡后不可攻击（问题 9）
+    local pm = PlayerManager.GetInstance()
+    local player = pm:GetPlayer(self.playerId)
+    if player == nil or not player.isAlive then return end
+
+    -- ★ firePressed 粘滞标记：每 click 发射一发箭矢
+    if InputHandler.firePressed then
+        -- ★ 本地：箭从摄像机位置射出，完美对准准星（FPS 体验）
+        --   摄像机前方 0.3m offset 避免箭出现在视野正中心遮挡视线
+        local spawnPos = self._cameraTransform.position + self._cameraTransform.forward * 0.3
+        local forward = self._cameraTransform.forward
+        Arrow.FireLocal(self.playerId, spawnPos, forward, GC.ARROW_SPEED, GC.ARROW_LIFETIME)
+    end
 end
 
 -- ========== 交互处理 ==========
@@ -472,6 +500,18 @@ function PlayerController:AcknowledgeUpTo(tick)
     end
 end
 
+--- 获取未确认输入的数量（不创建任何 table，零 GC）
+--- @return int
+function PlayerController:GetUnackedCount()
+    local count = 0
+    for tick, _ in pairs(self._inputBuffer) do
+        if tick > self._lastAckedTick then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 --- 获取所有未被服务端确认的输入（按 tick 升序排列）
 --- @return table[] — {{tick=int, data={moveDir,yaw,jump}}, ...}
 function PlayerController:GetUnackedInputs()
@@ -481,7 +521,7 @@ function PlayerController:GetUnackedInputs()
             result[#result + 1] = { tick = tick, data = data }
         end
     end
-    table.sort(result, function(a, b) return a.tick < b.tick end)
+    table.sort(result, _sortByTick)
     return result
 end
 

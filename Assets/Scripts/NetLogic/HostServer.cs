@@ -704,15 +704,15 @@ public class HostServer : MonoBehaviour
 
     /// <summary>
     /// 本机玩家提交本地输入（由 PlayerController 调用）。
-    /// cameraYawRaw/chargeTimeRaw 为 Fix64.Raw（long），不再经过 float 转换丢失精度。
+    /// cameraYawRaw/chargeTimeRaw/cameraPitchRaw 为 Fix64.Raw（long），不再经过 float 转换丢失精度。
     /// </summary>
-    public void SubmitHostInput(uint moveDir, bool jump, bool attack, bool skill, long cameraYawRaw, long chargeTimeRaw)
+    public void SubmitHostInput(uint moveDir, bool jump, bool attack, bool skill, long cameraYawRaw, long chargeTimeRaw, long cameraPitchRaw)
     {
         if (!_isRunning || !_isGameStarted || CurrentRoom == null) return;
 
         int hostPlayerId = CurrentRoom.HostPlayerId;
         _tickSyncHandler.SubmitLocalInput(hostPlayerId, moveDir, jump, attack, skill,
-            new Fix64(cameraYawRaw), new Fix64(chargeTimeRaw));
+            new Fix64(cameraYawRaw), new Fix64(chargeTimeRaw), new Fix64(cameraPitchRaw));
     }
 
     /// <summary>

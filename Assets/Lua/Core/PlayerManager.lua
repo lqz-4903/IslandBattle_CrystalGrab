@@ -22,6 +22,10 @@ local PlayerEntity = require("Core.PlayerEntity")
 local GC = require("Core.GameConst")
 local Fix64 = require("Fix64")
 local Vec3  = require("Fix64Vector3")
+local Arrow = require("Battle.Arrow")
+
+-- ★ GC优化：预缓存常量 Fix64 值，避免每 tick Fix64.fromFloat(GC.TICK_INTERVAL) 创建新表
+local TICK_DT_F64 = Fix64.fromFloat(GC.TICK_INTERVAL)
 
 local PlayerManager = {}
 PlayerManager.__index = PlayerManager
@@ -73,7 +77,19 @@ function PlayerManager:Init()
         end)
     end
 
-    print("[PlayerManager] 初始化完成，已注册 C# 回调")
+    -- ★ 箭矢系统初始化（对象池预加载 + 注册 Update）
+    Arrow.Init()
+
+    -- ★ Phase 2 预留：绑定箭矢命中玩家回调
+    Arrow.onHitPlayer = function(arrow, targetPlayerId)
+        local target = self.players[targetPlayerId]
+        if target and target.isAlive then
+            local hitPoint = arrow.go.transform.position
+            target:OnHitByArrow(arrow.ownerId, hitPoint)
+        end
+    end
+
+    print("[PlayerManager] 初始化完成，已注册 C# 回调 + 箭矢系统")
 end
 
 --- 关闭并清理
@@ -94,6 +110,9 @@ function PlayerManager:Shutdown()
         UnregisterLateUpdate(self._interpUpdateId)
         self._interpUpdateId = nil
     end
+
+    -- ★ 清理箭矢系统
+    Arrow.ClearAll()
 
     print("[PlayerManager] 已关闭")
 end
@@ -224,8 +243,16 @@ function PlayerManager:SpawnAllPlayers(playerList, localPlayerId)
         cc.stepOffset = 0.3     -- 允许自动上小台阶（不触发跳跃动画）
         cc.slopeLimit = 45      -- 45° 斜坡限制
         player.controller = cc
-        player:SetPosition(spawnPos.x, spawnPos.y, spawnPos.z)
+        -- ★ 修复 Bug1（飞天）：先设置 yaw 再设置 position
+        --   SetPosition → SyncTransform 内部读取 self.yaw 计算旋转，必须先初始化 yaw。
         player:SetYaw(spawnYaw)
+        player:SetPosition(spawnPos.x, spawnPos.y, spawnPos.z)
+        -- ★ 修复 Bug1（飞天）：读取 CharacterController 实际着地状态
+        --   PlayerEntity.new 默认 isGrounded=true，但 CC 可能实际未着地（生成点高于地形）。
+        --   不校正会导致首 tick 物理以错误着地状态执行：着地→垂直速度=0→不下降→浮空。
+        if not IsNull(cc) then
+            player.isGrounded = cc.isGrounded
+        end
 
         -- ★ 通知服务端出生点（死亡重生用）
         local hostServer = CS.HostServer.Instance
@@ -319,8 +346,13 @@ function PlayerManager:SpawnLocalOnly(playerId, playerName)
         cc.slopeLimit = 45
     end
     player.controller = cc
-    player:SetPosition(Fix64.fromFloat(pos.x), Fix64.fromFloat(pos.y), Fix64.fromFloat(pos.z))
+    -- ★ 修复 Bug1：先设置 yaw 再设置 position（SyncTransform 依赖 yaw）
     player:SetYaw(Fix64.fromFloat(rot.eulerAngles.y * 0.0174533))
+    player:SetPosition(Fix64.fromFloat(pos.x), Fix64.fromFloat(pos.y), Fix64.fromFloat(pos.z))
+    -- ★ 修复 Bug1：同步 CC 实际着地状态
+    if not IsNull(cc) then
+        player.isGrounded = cc.isGrounded
+    end
     self.players[playerId] = player
 
     print("[PlayerManager] 降级模式：仅生成本地玩家 " .. playerId .. " (" .. playerName .. ")")
@@ -387,12 +419,16 @@ function PlayerManager:ApplyFrameInput(input)
     local rpx = input.ResultPosX
     local rpy = input.ResultPosY
     local rpz = input.ResultPosZ
+    -- ★ GC优化：复用 _serverAuthPos table，原地更新 raw 值
+    --   避免每 tick 创建 {x=Fix64.new, y=Fix64.new, z=Fix64.new} (4 tables)
     if rpx ~= 0 or rpy ~= 0 or rpz ~= 0 then
-        player._serverAuthPos = {
-            x = Fix64.new(rpx),
-            y = Fix64.new(rpy),
-            z = Fix64.new(rpz),
-        }
+        if player._serverAuthPos == nil then
+            player._serverAuthPos = { x = Fix64.new(0), y = Fix64.new(0), z = Fix64.new(0) }
+        end
+        player._serverAuthPos.x.raw = rpx
+        player._serverAuthPos.y.raw = rpy
+        player._serverAuthPos.z.raw = rpz
+        player._hasServerAuthPos = true   -- 标记有新的权威位置待消费
     end
 
     -- ★ 客户端预测-校正：记录服务端回传的客户端 tick 编号
@@ -417,12 +453,12 @@ function PlayerManager:OnFrameEnd(tick)
     -- ★ 对所有玩家执行确定性移动（统一 30fps 物理）
     --   本地玩家 + 远程玩家：均由 _ApplyDeterministicMovement 驱动
     --   渲染由 _InterpolateAllPlayers 60fps 插值平滑
-    local tickDt = Fix64.fromFloat(GC.TICK_INTERVAL)
+    -- ★ GC优化：使用预缓存的 TICK_DT_F64，避免每 tick Fix64.fromFloat 创建新表
     for _, player in pairs(self.players) do
         if not player.isAlive then goto continue_physics end
         if player.controller == nil or IsNull(player.controller) then goto continue_physics end
 
-        self:_ApplyDeterministicMovement(player, tickDt)
+        self:_ApplyDeterministicMovement(player, TICK_DT_F64)
         ::continue_physics::
     end
 
@@ -515,11 +551,11 @@ function PlayerManager:_ApplyServerPositionCorrection(tick)
     -- 调用方已确保 not isHost，此处保留用于路径 B 的防护判断
     local isHost = false
     for _, player in pairs(self.players) do
-        local authPos = player._serverAuthPos
-        if authPos == nil then goto continue_corr end
+        -- ★ GC优化：用标志位代替 nil，避免每次校正后重新分配 _serverAuthPos 表
+        if not player._hasServerAuthPos then goto continue_corr end
+        player._hasServerAuthPos = false
 
-        -- ★ 一次性消费：校正后清除，防止重复校正
-        player._serverAuthPos = nil
+        local authPos = player._serverAuthPos
 
         local serverPos = CS.UnityEngine.Vector3(
             Fix64.toFloat(authPos.x),
@@ -572,23 +608,25 @@ function PlayerManager:_ApplyServerPositionCorrection(tick)
 
                 -- ★ 回滚到服务端权威位置
                 player.transform.position = serverPos
-                player.position = Vec3.new(
-                    Fix64.fromFloat(serverPos.x),
-                    Fix64.fromFloat(serverPos.y),
-                    Fix64.fromFloat(serverPos.z)
-                )
+                -- ★ GC优化：原地更新 position，避免 new Vec3 + 3 Fix64.fromFloat
+                if player.position == Vec3.ZERO then
+                    player.position = Vec3.zero()
+                end
+                player.position.x.raw = CS.Fix64.FromFloat(serverPos.x).Raw
+                player.position.y.raw = CS.Fix64.FromFloat(serverPos.y).Raw
+                player.position.z.raw = CS.Fix64.FromFloat(serverPos.z).Raw
 
                 -- ★ 回滚后同步着地状态（防止第一帧重放用错 isGrounded）
                 if player.controller ~= nil and not IsNull(player.controller) then
-                    local ok, grounded = pcall(function() return player.controller.isGrounded end)
-                    if ok then player.isGrounded = grounded end
+                    player.isGrounded = player.controller.isGrounded
                 end
 
                 -- ★ 重放未确认的输入，从服务端位置出发重新预测
                 self:_ReconcileReplayLocalInputs(player, PC)
 
                 if tick % 75 == 0 then
-                    local unackedCount = #PC:GetUnackedInputs()
+                    -- ★ GC优化：用 GetUnackedCount 代替 #GetUnackedInputs()，避免仅为了调试日志创建完整 table
+                    local unackedCount = PC:GetUnackedCount()
                     print(string.format(
                         "[PlayerManager] 校正[本地] 玩家%d drift=%.3fm → 回滚+重放%d帧 (echoTick=%d)",
                         player.playerId, drift, unackedCount, echoTick))
@@ -612,26 +650,29 @@ function PlayerManager:_ReconcileReplayLocalInputs(player, pc)
     local unackedInputs = pc:GetUnackedInputs()
     if #unackedInputs == 0 then return end
 
-    local tickDt = Fix64.fromFloat(GC.TICK_INTERVAL)
+    -- ★ GC优化：使用预缓存的 TICK_DT_F64
 
     -- 逐帧重放未确认的输入
     for _, entry in ipairs(unackedInputs) do
         local data = entry.data
         player.moveDir   = data.moveDir
-        player.yaw       = Fix64.fromFloat(data.yaw)
+        -- ★ GC优化：原地更新 raw 值，避免每重放帧 Fix64.fromFloat 创建新表
+        player.yaw.raw = CS.Fix64.FromFloat(data.yaw).Raw
         player.isJumping = data.jump or false
 
-        self:_ReplayDeterministicStep(player, tickDt)
+        self:_ReplayDeterministicStep(player, TICK_DT_F64)
     end
 
     -- 同步最终位置到 Lua position 记录
     if player.transform ~= nil and not IsNull(player.transform) then
         local pos = player.transform.position
-        player.position = Vec3.new(
-            Fix64.fromFloat(pos.x),
-            Fix64.fromFloat(pos.y),
-            Fix64.fromFloat(pos.z)
-        )
+        -- ★ GC优化：原地更新 position
+        if player.position == Vec3.ZERO then
+            player.position = Vec3.zero()
+        end
+        player.position.x.raw = CS.Fix64.FromFloat(pos.x).Raw
+        player.position.y.raw = CS.Fix64.FromFloat(pos.y).Raw
+        player.position.z.raw = CS.Fix64.FromFloat(pos.z).Raw
 
         -- ★ 修复：确保 _interpState 已初始化，防止本地玩家校正后插值状态缺失
         self:_InitInterpState(player)
@@ -652,7 +693,8 @@ function PlayerManager:_ReplayDeterministicStep(player, dt)
 
     local dtFloat = Fix64.toFloat(dt)
     local moveDir = player.moveDir
-    local yawFloat = Fix64.toFloat(player.yaw)
+    -- ★ 防御：player.yaw 改为 nil 初值，需容错
+    local yawFloat = player.yaw and Fix64.toFloat(player.yaw) or 0
 
     -- 水平移动
     local hVelocity = CS.UnityEngine.Vector3.zero
@@ -697,22 +739,25 @@ function PlayerManager:_ReplayDeterministicStep(player, dt)
         hVelocity.z * subDt
     )
     for _ = 1, subSteps do
-        local ok = pcall(function() controller:Move(subDisp) end)
+        local ok = pcall(controller.Move, controller, subDisp)
         if not ok then break end
     end
 
     -- 更新着地状态（刚起跳时不检测，防止首帧取消跳跃）
     if not justJumped then
-        local ok, grounded = pcall(function() return controller.isGrounded end)
-        if ok then player.isGrounded = grounded end
+        if not IsNull(controller) then
+            player.isGrounded = controller.isGrounded
+        end
     end
 
     -- 更新速度
-    player.velocity = Vec3.new(
-        Fix64.fromFloat(hVelocity.x),
-        Fix64.fromFloat(vertVelocity),
-        Fix64.fromFloat(hVelocity.z)
-    )
+    -- ★ GC优化：原地更新 velocity
+    if player.velocity == Vec3.ZERO then
+        player.velocity = Vec3.zero()
+    end
+    player.velocity.x.raw = CS.Fix64.FromFloat(hVelocity.x).Raw
+    player.velocity.y.raw = CS.Fix64.FromFloat(vertVelocity).Raw
+    player.velocity.z.raw = CS.Fix64.FromFloat(hVelocity.z).Raw
 end
 
 -- =============================================
@@ -810,7 +855,9 @@ function PlayerManager:_ApplyDeterministicMovement(player, dt)
     local controller = player.controller
     local dtFloat = Fix64.toFloat(dt)
     local moveDir = player.moveDir
-    local yawFloat = Fix64.toFloat(player.yaw)
+    -- ★ 防御：player.yaw 已改为 nil 初值，正常流程中 SetYaw 或 ApplyInput 会先设置。
+    --   若因时序异常（tick 先于 spawn 到达）仍未初始化，退化为 0（朝 +Z 轴）。
+    local yawFloat = player.yaw and Fix64.toFloat(player.yaw) or 0
     local yawDeg = math.deg(yawFloat)   -- ±180°
 
     -- ==== 插值状态初始化 ====
@@ -891,7 +938,7 @@ function PlayerManager:_ApplyDeterministicMovement(player, dt)
         hVelocity.z * subDt
     )
     for step = 1, subSteps do
-        local ok = pcall(function() controller:Move(subDisp) end)
+        local ok = pcall(controller.Move, controller, subDisp)
         if not ok then break end
     end
 
@@ -899,12 +946,21 @@ function PlayerManager:_ApplyDeterministicMovement(player, dt)
     -- ★ 刚刚起跳时不立即检测着地，防止首帧位移太小（<stepOffset）
     --    导致 CharacterController.isGrounded 仍为 true 而取消跳跃
     if not justJumped then
-        local ok, grounded = pcall(function() return controller.isGrounded end)
-        if ok then player.isGrounded = grounded end
+        -- ★ GC优化：IsNull 已优化为无闭包版本，先判空再安全访问属性
+        if not IsNull(controller) then
+            player.isGrounded = controller.isGrounded
+        end
     end
 
     -- ==== 存储速度（供动画/外推用）====
-    player.velocity = Vec3.new(Fix64.fromFloat(hVelocity.x), Fix64.fromFloat(vertVelocity), Fix64.fromFloat(hVelocity.z))
+    -- ★ GC优化：原地更新 velocity，避免每 tick new Vec3 + 3 Fix64
+    --   首次调用时 velocity 是共享的 Vec3.ZERO，需替换为新实例
+    if player.velocity == Vec3.ZERO then
+        player.velocity = Vec3.zero()
+    end
+    player.velocity.x.raw = CS.Fix64.FromFloat(hVelocity.x).Raw
+    player.velocity.y.raw = CS.Fix64.FromFloat(vertVelocity).Raw
+    player.velocity.z.raw = CS.Fix64.FromFloat(hVelocity.z).Raw
     player._hSpeed = hSpeed
     player._isRolling = isRolling
 
@@ -1001,8 +1057,10 @@ function PlayerManager:OnServerPlayerRespawn(playerId, posX, posY, posZ, hp)
         Fix64.new(posZ)
     )
     -- ★ 重置远程玩家的插值状态，避免从死亡位置 warp 到重生位置
+    --   同时清除缓存的 Animator 引用，重生后重新查找（防御性）
     if player.playerId ~= self.localPlayerId then
         player._interpState = nil
+        player._animatorCached = nil
     end
 end
 

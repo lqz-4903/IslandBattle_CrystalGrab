@@ -54,6 +54,25 @@ local function InitGame()
     local localPlayerId = _G.localPlayerId or 1
     local localPlayerName = _G.localPlayerName or "Player"
 
+    -- ★ 修复 Bug2（动画错位）：验证 localPlayerId 确实在 PlayerList 中
+    --   若 _G.localPlayerId 因未知原因未设置或错误，客户端可能默认为 1（主机 ID），
+    --   导致客户端将自身输入作为主机输入发送，主机模型被客户端操控，客户端自身模型不响应。
+    if _G.localPlayerId == nil then
+        print("[Main] ★ 警告：_G.localPlayerId 未设置，默认使用 1！这会导致客户端以主机身份运行！")
+    end
+    if playerList ~= nil and playerList.Players ~= nil and playerList.Players.Count > 0 then
+        local found = false
+        for i = 0, playerList.Players.Count - 1 do
+            if playerList.Players[i].PlayerId == localPlayerId then
+                found = true
+                break
+            end
+        end
+        if not found then
+            print("[Main] ★ 严重错误：localPlayerId=" .. localPlayerId .. " 不在 PlayerList 中！")
+        end
+    end
+
     print("[Main] ====== 初始化游戏 ======")
     print("[Main] 种子=" .. (gameData.randomSeed or 0) ..
           " 时长=" .. (gameData.gameDuration or 0) ..

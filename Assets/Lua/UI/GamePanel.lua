@@ -139,13 +139,18 @@ function GamePanel:OnTimerUpdate(_dt)
 end
 
 -- 更新倒计时显示
+-- ★ GC优化：缓存上次显示的时间值，只有秒数变化才更新文本（避免每帧 string.format）
 function GamePanel:UpdateTimerDisplay(remainTime)
     local txtTimer = self:GetControl("txtTimer", "Text")
     if txtTimer ~= nil then
         local time = math.max(0, math.floor(remainTime))
-        local minutes = math.floor(time / 60)
-        local seconds = time % 60
-        txtTimer.text = string.format("游戏倒计时 %d:%02d", minutes, seconds)
+        -- 仅当显示的秒数变化时才更新文本（60fps → 1fps 的 string.format 调用）
+        if self._lastDisplayedTime ~= time then
+            self._lastDisplayedTime = time
+            local minutes = math.floor(time / 60)
+            local seconds = time % 60
+            txtTimer.text = string.format("游戏倒计时 %d:%02d", minutes, seconds)
+        end
     else
         print("[GamePanel] 警告：找不到 txtTimer 控件")
     end

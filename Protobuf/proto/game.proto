@@ -142,6 +142,7 @@ message PlayerInput{
 	sfixed64 result_pos_x = 9;
 	sfixed64 result_pos_y = 10;
 	sfixed64 result_pos_z = 11;
+	sfixed64 camera_pitch = 12;	// 摄像机垂直角度（弧度, Fix64.Raw），用于箭矢方向计算
 
 }
 

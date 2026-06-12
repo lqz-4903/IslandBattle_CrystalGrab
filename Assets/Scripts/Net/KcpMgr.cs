@@ -234,6 +234,13 @@ public class KcpMgr : IKcpCallback
     /// </summary>
     private readonly ArrayPool<byte> _sendBufferPool = ArrayPool<byte>.Shared;
 
+    /// <summary>
+    /// 接收端 EndPoint 复用。
+    /// UdpRecvLoop 单线程使用，ReceiveFrom 会原地更新此对象，
+    /// 避免每次接收都 new IPEndPoint 产生 GC 压力。
+    /// </summary>
+    private readonly EndPoint _pooledRemoteEP = new IPEndPoint(IPAddress.Any, 0);
+
     // ───────── 异步接收信号 ─────────
 
     /// <summary>
@@ -328,8 +335,8 @@ public class KcpMgr : IKcpCallback
         this._resend = resend;
         this._nc = nc;
 
-        foreach (var kcp in _kcpDic.Values)
-            kcp.NoDelay(noDelay, interval, resend, nc);
+        foreach (var kvp in _kcpDic)
+            kvp.Value.NoDelay(noDelay, interval, resend, nc);
 
         await Task.CompletedTask;
     }
@@ -340,8 +347,8 @@ public class KcpMgr : IKcpCallback
         this._sendWin = sendWin;
         this._recvWin = recvWin;
 
-        foreach (var kcp in _kcpDic.Values)
-            kcp.WndSize(sendWin, recvWin);
+        foreach (var kvp in _kcpDic)
+            kvp.Value.WndSize(sendWin, recvWin);
 
         await Task.CompletedTask;
     }
@@ -351,8 +358,8 @@ public class KcpMgr : IKcpCallback
     {
         this._mtu = mtu;
 
-        foreach (var kcp in _kcpDic.Values)
-            kcp.SetMtu(mtu);
+        foreach (var kvp in _kcpDic)
+            kvp.Value.SetMtu(mtu);
 
         await Task.CompletedTask;
     }
@@ -641,8 +648,8 @@ public class KcpMgr : IKcpCallback
             await Task.WhenAny(_kcpUpdateTask, Task.Delay(1000));
 
         // 销毁所有 KCP 实例
-        foreach (var kcp in _kcpDic.Values)
-            kcp?.Dispose();
+        foreach (var kvp in _kcpDic)
+            kvp.Value?.Dispose();
         _kcpDic.Clear();
         _endPointToConvDic.Clear();
         _convToEndPointDic.Clear();
@@ -817,7 +824,7 @@ public class KcpMgr : IKcpCallback
         {
             try
             {
-                EndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+                EndPoint remoteEndPoint = _pooledRemoteEP;
 
                 // 在 Task.Run 中阻塞接收，避免卡住 async 状态机
                 int udpLen = await Task.Run(() => _socket.ReceiveFrom(_recvBuffer, ref remoteEndPoint));
@@ -898,14 +905,23 @@ public class KcpMgr : IKcpCallback
             catch (SocketException se)
             {
                 // 10004=WSAEINTR(socket关闭中断) 10038=WSAENOTSOCK(socket已关闭)
-                // 这些都是 StopAsync 关闭 Socket 时的正常现象，不是错误
-                if (_isRunning && se.ErrorCode != 10004 && se.ErrorCode != 10038)
+                // 10054=WSAECONNRESET(远程主机关闭连接，UDP收到ICMP Port Unreachable)
+                // 这些都是 StopAsync 关闭 Socket 或远程断连时的正常现象，不是错误
+                if (_isRunning && se.ErrorCode != 10004 && se.ErrorCode != 10038 && se.ErrorCode != 10054)
                     Debug.Log("【KcpMgr】UDP接收异常：" + se.ErrorCode + " " + se.Message);
+
+                // 防止死循环刷屏：远程断连后每次 ReceiveFrom 都会立即抛异常，加延迟避免 CPU 空转
+                if (_isRunning)
+                    await Task.Delay(100, _cts.Token);
             }
             catch (Exception e)
             {
                 if (_isRunning)
                     Debug.Log("【KcpMgr】UDP接收异常：" + e.Message);
+
+                // 防止死循环刷屏
+                if (_isRunning)
+                    await Task.Delay(100, _cts.Token);
             }
 
             // 有数据到达时通知 RecvAsync 等待者
@@ -980,9 +996,9 @@ public class KcpMgr : IKcpCallback
             {
                 await Task.Delay(UpdateIntervalMs, _cts.Token);
 
-                foreach (var kcp in _kcpDic.Values)
+                foreach (var kvp in _kcpDic)
                 {
-                    kcp.Update(DateTime.UtcNow);
+                    kvp.Value.Update(DateTime.UtcNow);
                 }
             }
             catch (OperationCanceledException)
@@ -1098,16 +1114,16 @@ public class KcpMgr : IKcpCallback
     }
 
     /// <summary>
-    /// ★ 向所有客户端广播数据（直接迭代 Keys + TryWrite，零分配）
+    /// ★ 向所有客户端广播数据（直接迭代字典，零分配）
     /// </summary>
     public void BroadcastToAll(byte[] data)
     {
         if (!_isServerMode) return;
 
-        foreach (uint conv in _kcpDic.Keys)
+        foreach (var kvp in _kcpDic)
         {
-            if (conv != 0)
-                _sendChannel.Writer.TryWrite((conv, data));
+            if (kvp.Key != 0)
+                _sendChannel.Writer.TryWrite((kvp.Key, data));
         }
     }
 
@@ -1186,8 +1202,8 @@ public class KcpMgr : IKcpCallback
         {
             OnRecvData?.Invoke(item.conv, item.data);
 
-            string msg = Encoding.UTF8.GetString(item.data);
-            OnRecvMsg?.Invoke(item.conv, msg);
+            if (OnRecvMsg != null)
+                OnRecvMsg.Invoke(item.conv, Encoding.UTF8.GetString(item.data));
         }
     }
 

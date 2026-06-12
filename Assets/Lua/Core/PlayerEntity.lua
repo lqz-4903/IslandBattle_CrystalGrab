@@ -16,6 +16,7 @@
 local Fix64 = require("Fix64")
 local Vec3  = require("Fix64Vector3")
 local GC    = require("Core.GameConst")
+local Arrow = require("Battle.Arrow")
 
 local PlayerEntity = {}
 PlayerEntity.__index = PlayerEntity
@@ -29,10 +30,13 @@ function PlayerEntity.new(playerId, playerName, isLocal)
     self.isLocal    = isLocal or false
     self.isAlive    = true
 
-    -- 确定性位置/朝向
-    self.position   = Vec3.new(Fix64.ZERO, Fix64.ZERO, Fix64.ZERO)
-    self.yaw        = Fix64.ZERO          -- 水平朝向角（弧度）
-    self.pitch      = Fix64.ZERO          -- 垂直视角角（弧度，仅本地使用）
+    -- 确定性位置/朝向（Vec3.zero() 创建独立 Fix64.new(0) 分量，可安全 .raw 原地修改）
+    self.position   = Vec3.zero()
+    -- ★ 修复：yaw/pitch/chargeTime 设为 nil，让 ApplyInput 首次调用时自动创建新实例。
+    --   若初始化为 Fix64.ZERO（模块级共享常量），ApplyInput 的 GC 优化路径会直接修改
+    --   Fix64.ZERO.raw，污染所有模块的 Fix64 零点语义，导致位置/速度计算错误。
+    self.yaw        = nil   -- 水平朝向角（弧度，由 ApplyInput 首次赋值）
+    self.pitch      = nil   -- 垂直视角角（弧度，仅本地使用）
 
     -- 服务端权威状态（由网络事件同步）
     self.hp         = GC.DEFAULT_HP
@@ -44,7 +48,7 @@ function PlayerEntity.new(playerId, playerName, isLocal)
     self.isJumping  = false
     self.isAttacking = false
     self.isUsingSkill  = false
-    self.chargeTime = Fix64.ZERO
+    self.chargeTime = nil  -- ★ 修复：nil 初值，避免共享 Fix64.ZERO
 
     -- Unity GameObject 引用
     self.gameObject = nil
@@ -52,13 +56,24 @@ function PlayerEntity.new(playerId, playerName, isLocal)
     self.controller = nil   -- CharacterController 组件引用
 
     -- 速度向量（用于本地物理模拟）
-    self.velocity   = Vec3.ZERO
-    self.isGrounded = true
+    -- ★★★ 关键修复：使用 Vec3.zero() 创建独立 Fix64.new(0) 分量。
+    --   Vec3.new(Fix64.ZERO, Fix64.ZERO, Fix64.ZERO) 的分量是共享的 Fix64.ZERO，
+    --   _ApplyDeterministicMovement 中 velocity.x.raw = ... 会直接污染 Fix64.ZERO.raw，
+    --   导致所有玩家的 Fix64 零点语义崩溃（如 else 分支：Fix64.toFloat(player.velocity.y) 返回非零值）。
+    self.velocity   = Vec3.zero()
+    self.isGrounded = true  -- 由 SpawnAllPlayers 在 CC 就绪后覆盖为实际值
 
     -- 跳跃动画状态（远程玩家用）
     self._isJumpingAnim   = false
     self._jumpInitiated   = false
     self._wasGroundedLast = true
+
+    -- ★ 攻击上升沿检测（false→true 触发箭矢发射，问题 1/3）
+    self._wasAttackingLastTick = false
+    self._isReplaying = false  -- 重连追帧期间跳过箭矢生成
+
+    -- 箭矢发射点缓存（HeroDefault/root/ArrowPoint）
+    self._arrowPointTransform = nil
 
     return self
 end
@@ -74,10 +89,36 @@ function PlayerEntity:ApplyInput(input)
     self.isUsingSkill = input.Skill
 
     -- 朝向：服务端权威 yaw（proto 中为 sfixed64，C# 属性为 long = Fix64.Raw）
-    self.yaw = Fix64.new(input.CameraYaw)
+    -- ★ GC优化：原地更新 raw 值，避免每次 tick new Fix64 table
+    if self.yaw == nil then
+        self.yaw = Fix64.new(input.CameraYaw)
+    else
+        self.yaw.raw = input.CameraYaw
+    end
 
     -- 蓄力时间（同样为 sfixed64 → long → Fix64.Raw）
-    self.chargeTime = Fix64.new(input.ChargeTime)
+    if self.chargeTime == nil then
+        self.chargeTime = Fix64.new(input.ChargeTime)
+    else
+        self.chargeTime.raw = input.ChargeTime
+    end
+
+    -- ★ 攻击上升沿检测：false→true 时发射箭矢
+    --     仅远程玩家走此路径（本地玩家由 PlayerController._ProcessAttack → FireLocal 负责）
+    --     重连追帧期间跳过（_isReplaying），避免幽灵箭矢
+    if input.Attack and not self._wasAttackingLastTick then
+        if not self.isLocal and not self._isReplaying then
+            -- ★ 远程：箭从 ArrowPoint（武器位置）射出，但方向对准该玩家视线前方的目标点。
+            --   第三人称视角下：箭从武器飞出，轨迹朝向瞄准方向，视觉自然。
+            local spawnPos = self:_GetArrowPointPos()
+            local forward = self:_ComputeForwardFromYawPitch(input.CameraYaw, input.CameraPitch)
+            local eyePos = self:GetCameraPosition()                         -- 眼睛高度
+            local targetPoint = eyePos + forward * 50.0                     -- 视线前方 50m 目标点
+            local arrowDir = (targetPoint - spawnPos).normalized            -- ArrowPoint → 目标点
+            Arrow.FireNetworked(self.playerId, spawnPos, arrowDir, GC.ARROW_SPEED, GC.ARROW_LIFETIME)
+        end
+    end
+    self._wasAttackingLastTick = input.Attack
 end
 
 -- ========== 位置/朝向 ==========
@@ -153,7 +194,8 @@ end
 function PlayerEntity:Respawn(hp)
     self.hp = hp or GC.DEFAULT_HP
     self.isAlive = true
-    self.velocity = Vec3.ZERO
+    -- ★ 使用 Vec3.zero() 替代 Vec3.ZERO：每个分量是独立的 Fix64.new(0)，后续 .raw 写入不会污染全局 Fix64.ZERO
+    self.velocity = Vec3.zero()
     if self.isLocal then
         self:NotifyUI()
     end
@@ -170,6 +212,55 @@ function PlayerEntity:NotifyUI()
         GamePanel:UpdateBloodDisplay()
         GamePanel:UpdateScore(self.score)
     end
+end
+
+-- ========== 箭矢相关 ==========
+
+--- 从 CameraYaw/CameraPitch（Fix64.Raw → long）计算世界空间前方向量
+--- @param yawRaw long — 水平朝向（Fix64.Raw，弧度）
+--- @param pitchRaw long — 垂直视角（Fix64.Raw，弧度）
+--- @return UnityEngine.Vector3 — 单位前方向量
+function PlayerEntity:_ComputeForwardFromYawPitch(yawRaw, pitchRaw)
+    local yaw   = CS.Fix64(yawRaw):ToFloat()
+    local pitch = CS.Fix64(pitchRaw):ToFloat()
+    local cosPitch = math.cos(pitch)
+    return CS.UnityEngine.Vector3(
+        cosPitch * math.sin(yaw),
+        -math.sin(pitch),
+        cosPitch * math.cos(yaw)
+    )
+end
+
+--- 获取箭矢发射点世界坐标（HeroDefault/root/ArrowPoint）
+--- 首次调用时查找并缓存 Transform，后续直接取 position。
+--- @return UnityEngine.Vector3 — 发射点世界坐标；找不到则降级为 transform.position + (0, 1.2, 0)
+function PlayerEntity:_GetArrowPointPos()
+    if self._arrowPointTransform == nil then
+        if self.transform ~= nil and not IsNull(self.transform) then
+            local rootTrans = self.transform:Find("root")
+            if rootTrans ~= nil then
+                self._arrowPointTransform = rootTrans:Find("ArrowPoint")
+            end
+        end
+    end
+    if self._arrowPointTransform ~= nil and not IsNull(self._arrowPointTransform) then
+        return self._arrowPointTransform.position
+    end
+    -- 降级：脚底 + 眼睛高度偏移
+    return self.transform.position + CS.UnityEngine.Vector3(0, 1.2, 0)
+end
+
+--- 被箭矢命中时调用（Phase 2 预留）
+--- ★ Phase 2：Trigger 触发 → Arrow.onHitPlayer → 此处
+--- @param ownerId int — 攻击者玩家 ID
+--- @param hitPoint UnityEngine.Vector3 — 命中点世界坐标（用于特效定位）
+function PlayerEntity:OnHitByArrow(ownerId, hitPoint)
+    -- ★ Phase 2 实现：
+    -- 1. 播放受击动画（Animator.SetTrigger("Hit")）
+    -- 2. 在 hitPoint 处播放受击粒子特效
+    -- 3. 播放受击音效
+    -- 4. 屏幕闪红（仅本地玩家）
+    -- 5. HP 扣减由服务端 PlayerHit 消息单独驱动（不在此处处理）
 end
 
 -- ========== 销毁 ==========
