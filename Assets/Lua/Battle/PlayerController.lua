@@ -77,6 +77,7 @@ function PlayerController:Init(playerId, isHost)
     self._tickTimer     = 0
     self._isRolling     = false
     self._rollTimer     = 0
+    self._smoothCamPos  = nil  -- ★ P0 摄像机平滑位置（每次 Init 重置）
 
     -- 客户端预测-校正：重置输入缓冲
     self._inputBuffer = {}
@@ -121,6 +122,7 @@ function PlayerController:Shutdown()
     self._bufPool = {}
     self._nextSendTick = 1
     self._lastAckedTick = 0
+    self._smoothCamPos = nil  -- ★ P0 清理
     InputHandler:UnlockCursor()
     print("[PlayerController] 已关闭")
 end
@@ -185,12 +187,8 @@ function PlayerController:_UpdateLocalInputState(_dt)
         end
     end
 
-    -- ★ 跳跃即时视觉反馈：按跳跃键时立即触发动画，不等 30fps tick
-    --   物理跳跃由 _ApplyDeterministicMovement 在下一个 tick 执行
-    --   动画由 _UpdateRemoteAnimator 读取 _jumpInitiated 驱动
-    if InputHandler.jumpPressed and player.isGrounded and not self._isRolling then
-        player._jumpInitiated = true
-    end
+    -- ★ 跳跃动画由 _ApplyDeterministicMovement 物理确认后驱动（_jumpInitiated）
+    --   不再在输入层预触发，确保动画、物理位移、摄像机三者在同一 tick 对齐
 end
 
 -- ========== 摄像机 ==========
@@ -198,7 +196,7 @@ end
 --- 摄像机路径（相对玩家 Prefab 根节点）
 local CAMERA_PATH = "CameraPoint/GameCamera"
 --- GameCamera 相对于玩家根节点的恒定局部偏移
-local CAMERA_LOCAL_POS = CS.UnityEngine.Vector3(-0.014, 1.283, 0.544)
+local CAMERA_LOCAL_POS = CS.UnityEngine.Vector3(-0.014, 1.283, 0.744)
 
 --- 获取摄像机（优先使用预制体上 CameraPoint/GameCamera 预挂载的）
 --- 远程玩家的摄像机会在 PlayerManager 中自动禁用。
@@ -280,7 +278,19 @@ function PlayerController:_UpdateCamera()
     -- 这样摄像机始终在玩家脸前，转身时绕玩家旋转，不会穿模看到后脑勺
     local yawQuat = CS.UnityEngine.Quaternion.Euler(0, yawDeg, 0)
     local worldOffset = yawQuat * CAMERA_LOCAL_POS
-    local rootPos = player.transform.position
+
+    -- ★ 摄像机 60fps 平滑跟随：消除本地玩家 transform 30fps 离散更新导致的画面抖动。
+    --   指数衰减平滑，半衰期 ~17ms（约 1 帧 @60fps），滞后量在 5m/s 下 < 4cm，不可感知。
+    local targetRootPos = player.transform.position
+    if self._smoothCamPos == nil then
+        self._smoothCamPos = targetRootPos
+    end
+    local dt = CS.UnityEngine.Time.deltaTime
+    local smoothFactor = 1.0 - math.exp(-40 * dt)
+    self._smoothCamPos = CS.UnityEngine.Vector3.Lerp(
+        self._smoothCamPos, targetRootPos, smoothFactor)
+    local rootPos = self._smoothCamPos
+
     self._cameraTransform.position = CS.UnityEngine.Vector3(
         rootPos.x + worldOffset.x,
         rootPos.y + worldOffset.y,
@@ -306,12 +316,13 @@ function PlayerController:_SubmitInput()
     end
 end
 
---- 主机模式：通过 HostServer 提交（传 Fix64.Raw，不再经过 float）
+--- 主机模式：构造 PlayerInput proto → 走 HostServer.OnLocalPlayerInput 统一入口
+--- （不再走 SubmitHostInput → SubmitLocalInput 快捷通道）
 function PlayerController:_SubmitHostInput(input)
     local hostServer = CS.HostServer.Instance
     if hostServer == nil or not hostServer.IsGameStarted then return end
 
-    -- 将 Lua float 转为 Fix64.Raw（long），消除 float→Fix64→float 往返精度丢失
+    -- 将 Lua float 转为 Fix64.Raw（long）
     local yawRaw   = CS.Fix64.FromFloat(input.cameraYaw).Raw
     local chargeRaw = CS.Fix64.FromFloat(input.chargeTime).Raw
     local pitchRaw = CS.Fix64.FromFloat(InputHandler.cameraPitch).Raw
@@ -322,15 +333,28 @@ function PlayerController:_SubmitHostInput(input)
         moveDir = moveDir | GC.MOVE_ROLL
     end
 
-    hostServer:SubmitHostInput(
-        moveDir,
-        input.jump,
-        input.attack,
-        input.skill,
-        yawRaw,
-        chargeRaw,
-        pitchRaw
-    )
+    -- ★★★ 诊断：主机本地提交的值（前 5 tick + 每 30 tick）★★★
+    local st = self._nextSendHostSeq or 0
+    if st <= 5 or st % 30 == 0 then
+        print(string.format("[PC] SubmitHost pid=%d sendSeq=%d md=%d yawRaw=%d yawDeg=%.1f",
+            self.playerId, st, moveDir, yawRaw, input.cameraYaw * 57.29578))
+    end
+    self._nextSendHostSeq = st + 1
+
+    -- ★ 构造 PlayerInput proto（与 _SubmitClientInput 完全相同的结构）
+    local playerInput = CS.GameProto.PlayerInput()
+    playerInput.PlayerId = self.playerId
+    playerInput.Tick = 0  -- 由服务端 OnLocalPlayerInput 覆盖为 _currentTick
+    playerInput.MoveDir = moveDir
+    playerInput.Jump = input.jump
+    playerInput.Attack = input.attack
+    playerInput.Skill = input.skill
+    playerInput.CameraYaw = yawRaw
+    playerInput.ChargeTime = chargeRaw
+    playerInput.CameraPitch = pitchRaw
+
+    -- ★ 走统一入口（不再调用 SubmitHostInput）
+    hostServer:OnLocalPlayerInput(playerInput)
 end
 
 --- 客户端模式：发送网络消息（CameraYaw/ChargeTime 现为 sfixed64 → long）
@@ -355,6 +379,12 @@ function PlayerController:_SubmitClientInput(input)
         moveDir = moveDir | GC.MOVE_ROLL
     end
     playerInput.MoveDir = moveDir
+
+    -- ★★★ 诊断：客户端发送的原始值（前 5 tick + 每 30 tick）★★★
+    if clientTick <= 5 or clientTick % 30 == 0 then
+        print(string.format("[PC] SubmitClient pid=%d clientTick=%d md=%d yawRaw=%d yawDeg=%.1f",
+            self.playerId, clientTick, moveDir, yawRaw, input.cameraYaw * 57.29578))
+    end
 
     -- ★ 客户端预测-校正：缓存输入供回滚重放（含翻滚标记）
     --    GC优化：复用 _bufPool 中的 table，避免每个 tick new {}

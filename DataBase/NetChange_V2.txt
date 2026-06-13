@@ -1,0 +1,296 @@
+# 网络层重构方案 V2 —— 基于实际代码的精准执行手册
+
+> **与原方案（NetChange.txt）的区别**：
+>   - 所有方法签名、类名、常量均与实际代码一致
+>   - 序列化用 Protobuf（不是 BinaryWriter）
+>   - 业务逻辑在 Lua 侧（不是 C# MonoBehaviour）
+>   - 自定义序列化走 Fix64（不是 float）
+>   - 只包含 Phase 1（统一输入入口）+ Phase 2（消除双重回调）
+>   - Phase 3-6 在项目中已有实现，不再重复
+
+---
+
+## Phase 1：统一输入入口
+
+### 目标
+
+让主机玩家的输入和远程客户端走**完全相同的** `HostServer.OnPlayerInput(uint conv, IMessage msg)` 入口，消除 `SubmitLocalInput` 快捷通道。
+
+### 当前两条路径
+
+**主机路径（内存直调，跳过 EventCenter）**：
+```
+Lua PlayerController:_SubmitHostInput()                          [Assets/Lua/Battle/PlayerController.lua:310]
+  → CS.HostServer.SubmitHostInput(moveDir, jump, attack, ...)    [Assets/Scripts/NetLogic/HostServer.cs:709]
+    → TickSyncHandler.SubmitLocalInput(hostPlayerId, ...)        [Assets/Scripts/NetLogic/TickSyncHandler.cs:290]
+      → 直接构造 PlayerInput proto，写入 _currentTickInputs[playerId]
+```
+
+**客户端路径（KCP → EventCenter）**：
+```
+Lua PlayerController:_SubmitClientInput()                        [Assets/Lua/Battle/PlayerController.lua:337]
+  → 构造 PlayerInput proto → NetMgr.Send(envelope)              [Assets/Lua/Battle/PlayerController.lua:381-383]
+    → KCP → 主机 NetMgr.OnRecvData()                             [Assets/Scripts/Net/NetMgr.cs:307]
+      → 反序列化 → _pending.Enqueue((21, conv, playerInput))
+        → Update() 中出队
+          → EventCenter.Dispatch(21, conv, msg)    // 3-param  [Assets/Scripts/Net/NetMgr.cs:126]
+          → EventCenter.Dispatch(21, msg)           // 2-param  [Assets/Scripts/Net/NetMgr.cs:128]
+            → HostServer.OnPlayerInput(conv, msg)               [Assets/Scripts/NetLogic/HostServer.cs:397]
+              → TickSyncHandler.HandlePlayerInput(msg)           [Assets/Scripts/NetLogic/TickSyncHandler.cs:268]
+                → 写入 _currentTickInputs[playerId]
+```
+
+### 差异
+
+| | 主机本地 | 远程客户端 |
+|---|---|---|
+| 入口 | `SubmitLocalInput(7个裸参数)` | `HandlePlayerInput(PlayerInput proto)` |
+| Tick 字段 | 服务端设置 `_currentTick` | 客户端预设 `_nextSendTick`（会被覆盖吗？不会——HandlePlayerInput 不修改 Tick） |
+| 经过 EventCenter | ❌ | ✅ Dispatch 两次 |
+| 构造方式 | C# 侧 `new PlayerInfo{}` | Lua 侧预先构造 proto |
+
+### 步骤 1.1：HostServer.cs — 新增 OnLocalPlayerInput
+
+**文件**：`Assets/Scripts/NetLogic/HostServer.cs`
+**位置**：放在 `SubmitHostInput` 方法之后（约第 717 行）
+
+```csharp
+/// <summary>
+/// 主机玩家的本地输入入口（统一路径）。
+/// 主机输入不再走 SubmitHostInput → SubmitLocalInput 快捷通道，
+/// 而是和远程客户端一样，构造 PlayerInput proto 后调用 OnPlayerInput。
+/// conv 使用 RoomData.HostConv (=0) 与远程客户端区分。
+/// </summary>
+public void OnLocalPlayerInput(PlayerInput input)
+{
+    if (!_isRunning || !_isGameStarted || CurrentRoom == null) return;
+
+    // 设置 Tick 为服务端当前帧号（远程客户端预设的 Tick 可能不对齐，
+    // 但 HandlePlayerInput 不修改 Tick，所以主机侧在此处统一设置）
+    input.Tick = _tickSyncHandler.CurrentTick;
+    input.PlayerId = CurrentRoom.HostPlayerId;
+
+    // 走与远程客户端完全相同的处理路径
+    OnPlayerInput(RoomData.HostConv, input);
+}
+```
+
+### 步骤 1.2：PlayerController.lua — 修改 _SubmitHostInput
+
+**文件**：`Assets/Lua/Battle/PlayerController.lua`
+**位置**：替换 `_SubmitHostInput` 函数（第 309-334 行）
+
+```lua
+--- 主机模式：构造 PlayerInput proto → 走 HostServer.OnLocalPlayerInput 统一入口
+--- （不再走 SubmitHostInput → SubmitLocalInput 快捷通道）
+function PlayerController:_SubmitHostInput(input)
+    local hostServer = CS.HostServer.Instance
+    if hostServer == nil or not hostServer.IsGameStarted then return end
+
+    -- 将 Lua float 转为 Fix64.Raw（long）
+    local yawRaw   = CS.Fix64.FromFloat(input.cameraYaw).Raw
+    local chargeRaw = CS.Fix64.FromFloat(input.chargeTime).Raw
+    local pitchRaw = CS.Fix64.FromFloat(InputHandler.cameraPitch).Raw
+
+    -- ★ 翻滚编码到 MoveDir 的 bit 4
+    local moveDir = input.moveDir
+    if self._isRolling then
+        moveDir = moveDir | GC.MOVE_ROLL
+    end
+
+    -- ★ 构造 PlayerInput proto（与 _SubmitClientInput 完全相同的结构）
+    local playerInput = CS.GameProto.PlayerInput()
+    playerInput.PlayerId = self.playerId
+    playerInput.Tick = 0  -- 由服务端 OnLocalPlayerInput 覆盖为 _currentTick
+    playerInput.MoveDir = moveDir
+    playerInput.Jump = input.jump
+    playerInput.Attack = input.attack
+    playerInput.Skill = input.skill
+    playerInput.CameraYaw = yawRaw
+    playerInput.ChargeTime = chargeRaw
+    playerInput.CameraPitch = pitchRaw
+
+    -- ★ 走统一入口（不再调用 SubmitHostInput）
+    hostServer:OnLocalPlayerInput(playerInput)
+end
+```
+
+### 步骤 1.3：清理 — 标记 SubmitHostInput 为废弃
+
+**文件**：`Assets/Scripts/NetLogic/HostServer.cs`
+**操作**：在 `SubmitHostInput` 方法上添加 `[System.Obsolete]` 注释，保留方法体以防回退
+
+```csharp
+/// <summary>
+/// [DEPRECATED] 请使用 OnLocalPlayerInput(PlayerInput) 统一入口。
+/// 保留此方法仅用于回退，后续版本将删除。
+/// </summary>
+[System.Obsolete("Use OnLocalPlayerInput(PlayerInput) instead")]
+public void SubmitHostInput(uint moveDir, bool jump, bool attack, bool skill, long cameraYawRaw, long chargeTimeRaw, long cameraPitchRaw)
+{
+    // ... 保持现有代码不变 ...
+}
+```
+
+`TickSyncHandler.SubmitLocalInput` 同样标记为废弃（但保留代码）。
+
+**文件**：`Assets/Scripts/NetLogic/TickSyncHandler.cs`，`SubmitLocalInput` 方法（约第 290 行）
+
+```csharp
+/// <summary>
+/// [DEPRECATED] 主机玩家提交本地输入。
+/// 请使用 HostServer.OnLocalPlayerInput(PlayerInput) 统一入口。
+/// 保留此方法仅用于回退，后续版本将删除。
+/// </summary>
+[System.Obsolete("Use HostServer.OnLocalPlayerInput(PlayerInput) instead")]
+public void SubmitLocalInput(int playerId, uint moveDir, bool jump, bool attack, bool skill, Fix64 cameraYaw, Fix64 chargeTime, Fix64 cameraPitch)
+{
+    // ... 保持现有代码不变 ...
+}
+```
+
+### 步骤 1.4：验证清单
+
+- [ ] 主机玩家 WASD 移动正常
+- [ ] 主机玩家跳跃/翻滚正常
+- [ ] 主机玩家攻击（鼠标左键）正常
+- [ ] 客户端玩家移动在主机屏幕上位置正确
+- [ ] 客户端玩家攻击在主机屏幕上方向正确
+- [ ] `_currentTickInputs` 中主机玩家的条目 Tick 字段为服务端当前帧号
+- [ ] 主机 `EventCenter` 对 msgId=21 只有 HostServer 监听（无额外副作用）
+
+---
+
+## Phase 2：消除 EventCenter 双重回调
+
+### 目标
+
+确保远程客户端发来的游戏事件在主机侧**只触发一次 Lua 回调**，而不是 NetMgr 触发一次 + GameEventHandler 再触发一次。
+
+### 问题根因
+
+**文件**：`Assets/Scripts/Net/NetMgr.cs`，第 126-128 行：
+
+```csharp
+// 派发到三参数字典（HostServer 等需要 conv 的监听者）
+EventCenter.Dispatch(item.msgId, item.conv, item.msg);    // → HostServer 处理器
+// 同时派发到二参数字典（LuaEventBridge）
+EventCenter.Dispatch(item.msgId, item.msg);                // → LuaEventBridge → Lua
+```
+
+**然后** GameEventHandler 验证后会再次派发（以 CrystalPickup 为例）：
+
+**文件**：`Assets/Scripts/NetLogic/GameEventHandler.cs`，第 367 行：
+```csharp
+EventCenter.Dispatch(31, pickup);  // → LuaEventBridge → Lua（第二次！）
+```
+
+**结果**：主机侧每个远程游戏事件触发了两次 Lua 回调。
+
+### 受影响的消息 ID
+
+| msgId | 消息 | GameEventHandler 验证后派发 |
+|---|---|---|
+| 30 | CrystalSpawn | ✅ 广播 + 本地 Dispatch |
+| 31 | CrystalPickup | ✅ 验证 + 本地 Dispatch |
+| 32 | PlayerHit | ✅ 验证 + 本地 Dispatch |
+| 33 | PlayerFall | ✅ 验证 + 本地 Dispatch |
+| 34 | GameEnd | ✅ 广播 + 本地 Dispatch |
+| 35 | PlayerRespawn | ✅ 验证 + 本地 Dispatch |
+| 38 | PhaseSwitch | ❌ 已弃用 |
+| 39 | CrystalDrop | ✅ 广播 + 本地 Dispatch |
+
+### 不受影响的消息
+
+- **msgId 16 (GameStart)**：由 RoomHandler 同时派发 3-param 和 2-param，不走 NetMgr 收包路径（主机主动广播）
+- **msgId 37 (PlayerOffline)**：NetMgr 自带 `OnPlayerOfflineCallback`，且通过 LuaEventBridge（2-param）触发
+- **msgId 21 (PlayerInput)**、**msgId 20 (InputTick)**：LuaEventBridge 不监听
+
+### 步骤 2.1：NetMgr.cs — 主机侧跳过游戏事件的 2-param 派发
+
+**文件**：`Assets/Scripts/Net/NetMgr.cs`
+**位置**：第 125-128 行，`while (_pending.TryDequeue(...))` 循环内
+
+**修改前**（第 125-128 行）：
+```csharp
+// 派发到三参数字典（HostServer 等需要 conv 的监听者）
+EventCenter.Dispatch(item.msgId, item.conv, item.msg);
+// 同时派发到二参数字典（GameTimerManager 等不需要 conv 的监听者）
+EventCenter.Dispatch(item.msgId, item.msg);
+```
+
+**修改后**：
+```csharp
+// 派发到三参数字典（HostServer 等需要 conv 的监听者）
+EventCenter.Dispatch(item.msgId, item.conv, item.msg);
+
+// 派发到二参数字典（LuaEventBridge 等不需要 conv 的监听者）
+// ★ 主机侧：游戏事件(30-39)由 GameEventHandler 验证后统一派发到 2-param，
+//   此处跳过以避免主机侧双重回调。
+//   客户端侧：HostServer 未运行，2-param 是唯一路径，必须派发。
+bool isHostRunning = HostServer.Instance != null && HostServer.Instance.IsRunning;
+bool isGameEvent = item.msgId >= 30 && item.msgId <= 39;
+if (!(isHostRunning && isGameEvent))
+{
+    EventCenter.Dispatch(item.msgId, item.msg);
+}
+```
+
+### 步骤 2.2：验证 — 确认 GameEventHandler 的本地 Dispatch 覆盖所有事件
+
+已在代码中确认，无需修改。每个 GameEventHandler 方法末尾都有 `EventCenter.Dispatch(msgId, msg)`：
+
+- `SpawnCrystalInZone` → `EventCenter.Dispatch(30, msg)` （第 296 行）
+- `SpawnCrystalAt` → `EventCenter.Dispatch(30, msg)` （第 320 行）
+- `HandleCrystalPickup` → `EventCenter.Dispatch(31, pickup)` （第 367 行）
+- `HandlePlayerHit` → `EventCenter.Dispatch(32, hit)` （第 398 行）
+- `HandlePlayerFall` → `EventCenter.Dispatch(33, fall)` （第 429 行）
+- `HandlePlayerRespawn` → `EventCenter.Dispatch(35, respawn)` （第 454 行）
+- `OnTimerEnd` → `EventCenter.Dispatch(34, gameEnd)` （第 583 行）
+- `HandlePlayerDeath` → `EventCenter.Dispatch(39, dropMsg)` + `EventCenter.Dispatch(35, respawn)` （第 512, 528 行）
+- `BroadcastTimerUpdate` → `EventCenter.Dispatch(36, msg)` （第 333 行）
+
+### 步骤 2.3：验证清单
+
+- [ ] 主机玩家拾取水晶 → NetworkEventMgr._OnCrystalPickup 只触发一次
+- [ ] 客户端玩家拾取水晶 → NetworkEventMgr._OnCrystalPickup 只触发一次（主机视角）
+- [ ] 受击事件（PlayerHit）→ _OnPlayerHit 只触发一次
+- [ ] 坠落事件（PlayerFall）→ _OnPlayerFall 只触发一次
+- [ ] 客户端收到水晶生成 → _OnCrystalSpawn 正常触发（客户端路径不受影响）
+- [ ] 客户端收到 GameStart → OnGameStartCallback + _OnGameStart 均正常（客户端路径不受影响）
+
+---
+
+## 执行顺序
+
+```
+Phase 1（统一输入入口）
+  ↓ 测试主机移动/攻击/跳跃
+Phase 2（消除双重回调）
+  ↓ 测试游戏事件回调次数
+```
+
+## 涉及文件总览
+
+| 文件 | Phase | 操作 |
+|---|---|---|
+| `Assets/Scripts/NetLogic/HostServer.cs` | 1 | 新增 `OnLocalPlayerInput`，标记 `SubmitHostInput` 废弃 |
+| `Assets/Lua/Battle/PlayerController.lua` | 1 | 重写 `_SubmitHostInput`，构造 proto → 调用 `OnLocalPlayerInput` |
+| `Assets/Scripts/Net/NetMgr.cs` | 2 | 主机侧跳过游戏事件 2-param 派发（1 个 if 判断） |
+
+## 无需修改的文件
+
+- `TickSyncHandler.cs` — `SubmitLocalInput` 保留不动（废弃但不删除，避免回退困难）
+- `GameEventHandler.cs` — 已正确实现「验证→广播→本地 Dispatch」模式
+- `LuaEventBridge.cs` — 已正确注册在 2-param 字典
+- `NetworkEventMgr.lua` — 回调逻辑无需改动
+
+## 回退方案
+
+如果 Phase 1 出现问题：
+1. Lua `_SubmitHostInput` 恢复调用 `hostServer:SubmitHostInput(...)`
+2. C# `OnLocalPlayerInput` 无需删除（不被调用就无影响）
+
+如果 Phase 2 出现问题：
+1. 删除 NetMgr.cs 中的 `if (!(isHostRunning && isGameEvent))` 判断
+2. 恢复无条件 2-param Dispatch

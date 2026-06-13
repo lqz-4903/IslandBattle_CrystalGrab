@@ -88,6 +88,16 @@ function PlayerEntity:ApplyInput(input)
     self.isAttacking  = input.Attack
     self.isUsingSkill = input.Skill
 
+    -- ★★★ 诊断：打印原始输入值（前 5 tick + 每 30 tick）★★★
+    local pm = require("Core.PlayerManager").GetInstance()
+    if pm.frameCount <= 5 or pm.frameCount % 30 == 0 then
+        local isHost = CS.HostServer.Instance ~= nil and CS.HostServer.Instance.IsGameStarted
+        local hostTag = isHost and "HOST" or "CLIENT"
+        print(string.format("[PE] ApplyInput #%d %s pid=%d tick=%d md=%d yawRaw=%d",
+            pm.frameCount, hostTag, input.PlayerId, input.Tick,
+            input.MoveDir, input.CameraYaw))
+    end
+
     -- 朝向：服务端权威 yaw（proto 中为 sfixed64，C# 属性为 long = Fix64.Raw）
     -- ★ GC优化：原地更新 raw 值，避免每次 tick new Fix64 table
     if self.yaw == nil then

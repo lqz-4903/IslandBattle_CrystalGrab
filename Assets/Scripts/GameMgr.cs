@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.IO;
+using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public class GameMgr : MonoBehaviour
@@ -33,6 +34,9 @@ public class GameMgr : MonoBehaviour
 
         _instance = this;
         DontDestroyOnLoad(gameObject);
+
+        // 日志写入文件（Logs/aw.txt），方便诊断帧同步问题
+        Application.logMessageReceived += OnLogMessageReceived;
 
         // 从代码创建 Canvas / EventSystem / UICamera（幂等，仅首次生效）
         SceneMgr.Instance.Init();
@@ -97,7 +101,7 @@ public class GameMgr : MonoBehaviour
 
     void OnDestroy()
     {
-        // 注销场景回调
+        Application.logMessageReceived -= OnLogMessageReceived;
         SceneManager.sceneLoaded -= OnSceneLoadedCallback;
 
         if (luaUpdate != null)
@@ -110,5 +114,18 @@ public class GameMgr : MonoBehaviour
             luaOnSceneLoaded.Dispose();
             luaOnSceneLoaded = null;
         }
+    }
+
+    private static readonly string LogPath = string.Format("Logs/aw_{0}.txt",
+        System.Diagnostics.Process.GetCurrentProcess().Id);
+
+    private void OnLogMessageReceived(string condition, string stackTrace, LogType type)
+    {
+        try
+        {
+            string time = System.DateTime.Now.ToString("HH:mm:ss.fff");
+            File.AppendAllText(LogPath, string.Format("[{0}] {1}\n", time, condition));
+        }
+        catch { }
     }
 }

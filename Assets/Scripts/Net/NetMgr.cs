@@ -124,8 +124,17 @@ public class NetMgr : MonoBehaviour
         {
             // 派发到三参数字典（HostServer 等需要 conv 的监听者）
             EventCenter.Dispatch(item.msgId, item.conv, item.msg);
-            // 同时派发到二参数字典（GameTimerManager 等不需要 conv 的监听者）
-            EventCenter.Dispatch(item.msgId, item.msg);
+
+            // 派发到二参数字典（LuaEventBridge 等不需要 conv 的监听者）
+            // ★ 主机侧：游戏事件(30-39)由 GameEventHandler 验证后统一派发到 2-param，
+            //   此处跳过以避免主机侧双重回调。
+            //   客户端侧：HostServer 未运行，2-param 是唯一路径，必须派发。
+            bool isHostRunning = HostServer.Instance != null && HostServer.Instance.IsRunning;
+            bool isGameEvent = item.msgId >= 30 && item.msgId <= 39;
+            if (!(isHostRunning && isGameEvent))
+            {
+                EventCenter.Dispatch(item.msgId, item.msg);
+            }
 
             // Lua 回调桥接
             if (item.msgId == 13 && OnJoinRoomAckCallback != null && item.msg is JoinRoomAck ack)

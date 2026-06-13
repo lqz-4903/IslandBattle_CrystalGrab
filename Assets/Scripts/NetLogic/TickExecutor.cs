@@ -46,8 +46,8 @@ public class TickExecutor : MonoBehaviour
     // 默认逻辑帧率（每秒30帧）
     private const int DefaultTickRate = 30;
 
-    // 追赶模式下每帧最多执行的帧数 （防止一帧内执行过多导致卡顿）
-    private const int MaxCatchUpPreTick = 5;
+    // 追赶模式下每帧最多执行的帧数（降至 2，配合 P1 软着陆消除画面跳跃）
+    private const int MaxCatchUpPreTick = 2;
 
     #endregion
 
@@ -190,7 +190,7 @@ public class TickExecutor : MonoBehaviour
                     ExecuteSingleTick(result);
             }
 
-            if (_pendingTicks.Count > 3)
+            if (_pendingTicks.Count > 1)
             {
                 _isCatchingUp = true;
                 Debug.Log("【TickExcutor】帧积压 " + _pendingTicks.Count + " 帧 进入追赶模式");

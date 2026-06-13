@@ -397,7 +397,12 @@ public class HostServer : MonoBehaviour
     private void OnPlayerInput(uint conv, IMessage msg)
     {
         if (!_isRunning || !_isGameStarted) return;
-        _tickSyncHandler.HandlePlayerInput(msg as PlayerInput);
+        var input = msg as PlayerInput;
+        // ★★★ 诊断：打印反序列化后的原始 PlayerInput 值（前 5 tick + 每 30 tick）★★★
+        if (input != null && (input.Tick <= 5 || input.Tick % 30 == 0))
+            Debug.Log(string.Format("[HS] OnPlayerInput pid={0} tick={1} md={2} yawRaw={3}",
+                input.PlayerId, input.Tick, input.MoveDir, input.CameraYaw));
+        _tickSyncHandler.HandlePlayerInput(input);
     }
 
     // — 游戏事件 —
@@ -703,9 +708,10 @@ public class HostServer : MonoBehaviour
     #region =============== 主机玩家输入 ===============
 
     /// <summary>
-    /// 本机玩家提交本地输入（由 PlayerController 调用）。
-    /// cameraYawRaw/chargeTimeRaw/cameraPitchRaw 为 Fix64.Raw（long），不再经过 float 转换丢失精度。
+    /// [DEPRECATED] 请使用 OnLocalPlayerInput(PlayerInput) 统一入口。
+    /// 保留此方法仅用于回退，后续版本将删除。
     /// </summary>
+    [System.Obsolete("Use OnLocalPlayerInput(PlayerInput) instead")]
     public void SubmitHostInput(uint moveDir, bool jump, bool attack, bool skill, long cameraYawRaw, long chargeTimeRaw, long cameraPitchRaw)
     {
         if (!_isRunning || !_isGameStarted || CurrentRoom == null) return;
@@ -713,6 +719,25 @@ public class HostServer : MonoBehaviour
         int hostPlayerId = CurrentRoom.HostPlayerId;
         _tickSyncHandler.SubmitLocalInput(hostPlayerId, moveDir, jump, attack, skill,
             new Fix64(cameraYawRaw), new Fix64(chargeTimeRaw), new Fix64(cameraPitchRaw));
+    }
+
+    /// <summary>
+    /// 主机玩家的本地输入入口（统一路径）。
+    /// 主机输入不再走 SubmitHostInput → SubmitLocalInput 快捷通道，
+    /// 而是和远程客户端一样，构造 PlayerInput proto 后调用 OnPlayerInput。
+    /// conv 使用 RoomData.HostConv (=0) 与远程客户端区分。
+    /// </summary>
+    public void OnLocalPlayerInput(PlayerInput input)
+    {
+        if (!_isRunning || !_isGameStarted || CurrentRoom == null) return;
+
+        // 设置 Tick 为服务端当前帧号（远程客户端预设的 Tick 可能不对齐，
+        // 但 HandlePlayerInput 不修改 Tick，所以主机侧在此处统一设置）
+        input.Tick = _tickSyncHandler.CurrentTick;
+        input.PlayerId = CurrentRoom.HostPlayerId;
+
+        // 走与远程客户端完全相同的处理路径
+        OnPlayerInput(RoomData.HostConv, input);
     }
 
     /// <summary>

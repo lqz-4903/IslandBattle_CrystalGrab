@@ -436,11 +436,24 @@ function PlayerManager:ApplyFrameInput(input)
     --   用于判断哪些输入已被服务端物理消费，哪些需要重放
     if player.playerId == self.localPlayerId then
         player._serverEchoedTick = input.Tick
+        -- ★ 每 tick 清理已消费的输入（无论是否触发校正），避免缓冲区无限增长
+        --   且防止 reconciliation 重放已被服务端执行的 tick 导致双倍位移
+        if input.Tick > 0 then
+            local PC = require("Battle.PlayerController")
+            PC:AcknowledgeUpTo(input.Tick)
+        end
     end
 end
 
 function PlayerManager:OnFrameEnd(tick)
     self.frameCount = self.frameCount + 1
+
+    -- ★ 诊断：前 5 帧 + 每 30 帧输出，确认 OnFrameEnd 被执行
+    if self.frameCount <= 5 or self.frameCount % 30 == 0 then
+        local hostTag = (CS.HostServer.Instance ~= nil and CS.HostServer.Instance.IsGameStarted) and "HOST" or "CLIENT"
+        print(string.format("[PM] OnFrameEnd #%d tick=%d %s players=%d",
+            self.frameCount, tick.Tick, hostTag, self:GetPlayerCount()))
+    end
 
     local isHost = (CS.HostServer.Instance ~= nil and CS.HostServer.Instance.IsGameStarted)
 
@@ -458,7 +471,7 @@ function PlayerManager:OnFrameEnd(tick)
         if not player.isAlive then goto continue_physics end
         if player.controller == nil or IsNull(player.controller) then goto continue_physics end
 
-        self:_ApplyDeterministicMovement(player, TICK_DT_F64)
+        self:_ApplyDeterministicMovement(player, TICK_DT_F64, isHost)
         ::continue_physics::
     end
 
@@ -597,14 +610,11 @@ function PlayerManager:_ApplyServerPositionCorrection(tick)
             local threshold = GC.RECONCILE_THRESHOLD or 0.02
 
             if drift > threshold then
-                -- ★ 确认服务端已消费的客户端输入
-                --   服务端回传的客户端 tick T 意味着：tick < T 的输入已被服务端物理执行
-                --   （T 本身正在被当前 server tick 消费，结果尚未反映在此次权威位置中）
+                -- ★ 已消费的 tick 已在 ApplyFrameInput 中通过 AcknowledgeUpTo 清理。
+                --   此处只需回滚 + 重放未确认的未来 tick（> echoTick），
+                --   _ApplyDeterministicMovement 会应用当前 tick 的输入（= echoTick）。
                 local echoTick = player._serverEchoedTick or 0
                 local PC = require("Battle.PlayerController")
-                if echoTick > 0 then
-                    PC:AcknowledgeUpTo(echoTick - 1)
-                end
 
                 -- ★ 回滚到服务端权威位置
                 player.transform.position = serverPos
@@ -650,6 +660,12 @@ function PlayerManager:_ReconcileReplayLocalInputs(player, pc)
     local unackedInputs = pc:GetUnackedInputs()
     if #unackedInputs == 0 then return end
 
+    -- ★ 保存当前 tick 的输入（由 ApplyFrameInput 设置），重放结束后恢复，
+    --    避免 _ApplyDeterministicMovement 使用重放最后一帧的旧输入导致方向错误。
+    local savedMoveDir = player.moveDir
+    local savedYawRaw = player.yaw.raw
+    local savedJumping = player.isJumping
+
     -- ★ GC优化：使用预缓存的 TICK_DT_F64
 
     -- 逐帧重放未确认的输入
@@ -662,6 +678,11 @@ function PlayerManager:_ReconcileReplayLocalInputs(player, pc)
 
         self:_ReplayDeterministicStep(player, TICK_DT_F64)
     end
+
+    -- ★ 恢复当前 tick 的输入，供后续 _ApplyDeterministicMovement 使用
+    player.moveDir = savedMoveDir
+    player.yaw.raw = savedYawRaw
+    player.isJumping = savedJumping
 
     -- 同步最终位置到 Lua position 记录
     if player.transform ~= nil and not IsNull(player.transform) then
@@ -851,7 +872,7 @@ end
 ---   3. 远程玩家：Transform 回退到 prevPos（渲染滞后 1 tick，由插值器 60fps 驱动前进）
 ---      本地玩家：保持在 targetPos（最新物理位置），摄像机跟随即时位置，无滞后
 ---   4. 保存 yaw / velocity 供旋转插值使用
-function PlayerManager:_ApplyDeterministicMovement(player, dt)
+function PlayerManager:_ApplyDeterministicMovement(player, dt, isHost)
     local controller = player.controller
     local dtFloat = Fix64.toFloat(dt)
     local moveDir = player.moveDir
@@ -868,7 +889,21 @@ function PlayerManager:_ApplyDeterministicMovement(player, dt)
     -- ★ 关键修复：使用上一 tick 的物理终点作为新起点，而非当前渲染位置
     --   这样插值链条保持连续，不会在 tick 边界产生视觉跳跃
     if st.targetPos ~= nil then
-        st.prevPos = st.targetPos           -- 链式传递：旧目标 → 新起点
+        -- ★ 主机端：始终使用正常链式传递（st.prevPos = st.targetPos）。
+        --   主机端 tick 以稳定 30fps 生成，不存在追赶模式多 tick 场景，
+        --   P1 软着陆不需要，且没有权威校正兜底，软着陆断链会累积位置偏差。
+        -- ★ 客户端：软着陆保护（同帧双 tick / 追赶模式时从渲染位置起插，避免画面跳跃）。
+        if not isHost and player.transform ~= nil then
+            local renderPos = player.transform.position
+            local drift = (renderPos - st.targetPos).magnitude
+            if drift > 0.005 then
+                st.prevPos = renderPos  -- 从当前渲染位置出发（软着陆）
+            else
+                st.prevPos = st.targetPos  -- 正常链式传递
+            end
+        else
+            st.prevPos = st.targetPos
+        end
         st.prevYaw = st.targetYaw           -- 旋转同理
         st.prevVelocity = st._rawVelocity    -- 速度同理（水平分量，用于外推）
     else
@@ -971,6 +1006,16 @@ function PlayerManager:_ApplyDeterministicMovement(player, dt)
         st._rawVelocity = CS.UnityEngine.Vector3(hVelocity.x, 0, hVelocity.z)  -- 水平速度（用于外推）
         st.hasTarget = true
         st.elapsed = 0  -- ★ 重置插值计时器
+
+        -- ★★★ 诊断：前 5 tick + 每 30 tick 打印每个玩家的位置变化 ★★★
+        if self.frameCount <= 5 or self.frameCount % 30 == 0 then
+            local tag = (player.playerId == self.localPlayerId) and "LOCAL" or "REMOTE"
+            local delta = (st.targetPos - st.prevPos).magnitude
+            print(string.format("[PM] Move #%d tick=%d pid=%d %s moveDir=%d yaw=%.1fdeg isGnd=%s delta=%.3fm pos=(%.2f,%.2f,%.2f)",
+                self.frameCount, self.frameCount, player.playerId, tag,
+                moveDir, yawDeg, tostring(player.isGrounded), delta,
+                st.targetPos.x, st.targetPos.y, st.targetPos.z))
+        end
 
         -- ★ 本地玩家：保持在 targetPos（最新物理位置），不倒退
         --   跳过插值延迟，摄像机跟随即时位置，输入响应更跟手

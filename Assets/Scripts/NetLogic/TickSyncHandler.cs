@@ -79,6 +79,24 @@ public class TickSyncHandler
     private Dictionary<int, PlayerInput> _currentTickInputs = new();
 
     /// <summary>
+    /// 提前到达的输入缓冲区（Phase 1 期间收到的输入暂存于此）。
+    /// 在 BeginNewTick 时消费，避免 HandlePlayerInput 的 _isWaitingForInput 检查丢弃输入。
+    /// </summary>
+    private Dictionary<int, PlayerInput> _earlyInputs = new();
+
+    /// <summary>
+    /// 每个客户端最后一次收到的 PlayerInput.Tick 值。
+    /// 用于调试追踪，以及空输入时保留客户端 tick 上下文。
+    /// </summary>
+    private Dictionary<int, int> _lastClientTick = new();
+
+    /// <summary>
+    /// 每个玩家最后一次收到的有效输入（非空）。
+    /// 用于空输入时保留 CameraYaw/CameraPitch，防止角色朝向被重置为 0。
+    /// </summary>
+    private Dictionary<int, PlayerInput> _lastValidInput = new();
+
+    /// <summary>
     /// Phase 2: 上一 tick 执行后的服务端权威位置。
     /// 由 Lua PlayerManager 在主机 OnFrameEnd 后通过 HostServer 桥接填入。
     /// 在组装下一 tick 的 InputTick 时附加到 PlayerInput.ResultPosX/Y/Z 中。
@@ -115,6 +133,9 @@ public class TickSyncHandler
         _isWaitingForInput = false;
         _activePlayers.Clear();
         _currentTickInputs.Clear();
+        _earlyInputs.Clear();
+        _lastClientTick.Clear();
+        _lastValidInput.Clear();
         _previousTickPositions.Clear();
         _tickHistory.Clear();
 
@@ -132,6 +153,9 @@ public class TickSyncHandler
     public void Stop()
     {
         _isRunning = false;
+        _earlyInputs.Clear();
+        _lastClientTick.Clear();
+        _lastValidInput.Clear();
         Debug.Log("【TickSyncHandler】帧同步停止， 最终帧号：" + _currentTick);
     }
 
@@ -194,6 +218,19 @@ public class TickSyncHandler
         //   清除统一在 FinalizeTick() 读取后执行。
         _waitTimer = Fix64.Zero;
         _isWaitingForInput = true;
+
+        // ★ 消费 Phase 1 期间缓冲的提前到达输入
+        foreach (var kvp in _earlyInputs)
+        {
+            _currentTickInputs[kvp.Key] = kvp.Value;
+        }
+        int earlyCount = _earlyInputs.Count;
+        _earlyInputs.Clear();
+
+        // ★ 每 tick 输出诊断信息（前 5 tick + 每 30 tick）
+        if (_currentTick <= 5 || _currentTick % 30 == 0)
+            Debug.Log(string.Format("[TickSync] BeginTick={0} earlyInputs={1} waitingForInputs",
+                _currentTick, earlyCount));
     }
 
     /// <summary>
@@ -210,27 +247,44 @@ public class TickSyncHandler
             Tick = _currentTick
         };
 
+        // ★ 前 5 tick + 每 30 tick 输出帧组装信息
+        bool shouldLog = _currentTick <= 5 || _currentTick % 30 == 0;
+        int receivedCount = 0, emptyCount = 0;
+
         foreach (int playerId in _activePlayers)
         {
             PlayerInput input;
             if (_currentTickInputs.TryGetValue(playerId, out PlayerInput existing))
             {
                 input = existing;
+                receivedCount++;
             }
             else
             {
                 // 超时：填充空输入
+                // ★ 修复 Bug2：Tick 使用 0 而非 _currentTick。
+                //    服务端 tick 号与客户端 tick 计数器独立，使用服务端号会导致客户端
+                //    AcknowledgeUpTo(serverTick-1) 清空所有客户端缓冲输入，永久丢失。
+                //    Tick=0 时 AcknowledgeUpTo(-1) 无操作，缓冲区完整保留。
+                // ★ CameraYaw/CameraPitch 继承上次有效输入，防止角色朝向被重置为 0。
+                long lastYaw = 0L, lastPitch = 0L;
+                if (_lastValidInput.TryGetValue(playerId, out var lastInput))
+                {
+                    lastYaw = lastInput.CameraYaw;
+                    lastPitch = lastInput.CameraPitch;
+                }
+                emptyCount++;
                 input = new PlayerInput
                 {
                     PlayerId = playerId,
-                    Tick = _currentTick,
+                    Tick = 0,
                     MoveDir = 0,
                     Jump = false,
                     Attack = false,
                     Skill = false,
-                    CameraYaw = 0L,
+                    CameraYaw = lastYaw,
                     ChargeTime = 0L,
-                    CameraPitch = 0L
+                    CameraPitch = lastPitch
                 };
             }
 
@@ -244,6 +298,10 @@ public class TickSyncHandler
 
             inputTick.Inputs.Add(input);
         }
+
+        if (shouldLog)
+            Debug.Log(string.Format("[TickSync] FinalizeTick={0} recv={1} empty={2}",
+                _currentTick, receivedCount, emptyCount));
 
         // 清空上一 tick 位置（仅使用一次）
         _previousTickPositions.Clear();
@@ -267,15 +325,31 @@ public class TickSyncHandler
     /// <param name="input"></param>
     public void HandlePlayerInput(PlayerInput input)
     {
-        if (!_isRunning || !_isWaitingForInput) return;
+        if (!_isRunning) return;
         if (!_activePlayers.Contains(input.PlayerId)) return;
+
+        // 追踪每个客户端最后一次收到的 tick 编号
+        if (input.Tick > 0)
+            _lastClientTick[input.PlayerId] = input.Tick;
+
+        // ★ 保存最后有效输入，用于空输入时保留 CameraYaw/CameraPitch
+        _lastValidInput[input.PlayerId] = input;
+
+        // ★ 修复 Bug1：Phase 1（_isWaitingForInput=false）期间收到的输入暂存到 _earlyInputs，
+        //    下一帧 BeginNewTick 时消费，不再静默丢弃。
+        if (!_isWaitingForInput)
+        {
+            _earlyInputs[input.PlayerId] = input;
+            return;
+        }
 
         _currentTickInputs[input.PlayerId] = input;
     }
 
     /// <summary>
-    /// 主机玩家提交本地输入（不走网络）
-    /// 由PlayerController 等游戏逻辑调用
+    /// [DEPRECATED] 主机玩家提交本地输入。
+    /// 请使用 HostServer.OnLocalPlayerInput(PlayerInput) 统一入口。
+    /// 保留此方法仅用于回退，后续版本将删除。
     /// </summary>
     /// <param name="playerId"></param>
     /// <param name="moveDir"></param>
@@ -283,10 +357,8 @@ public class TickSyncHandler
     /// <param name="skill"></param>
     /// <param name="cameraYaw"></param>
     /// <param name="chargeTime"></param>
-    /// <summary>
-    /// 主机玩家提交本地输入。cameraYaw/chargeTime/cameraPitch 已由调用方转为 Fix64。
-    /// ★ Proto 改为 sfixed64 后直接传 Fix64.Raw（long），不再丢失精度。
-    /// </summary>
+    /// <param name="cameraPitch">相机俯仰角（Fix64）</param>
+    [System.Obsolete("Use HostServer.OnLocalPlayerInput(PlayerInput) instead")]
     public void SubmitLocalInput(int playerId, uint moveDir, bool jump, bool attack, bool skill, Fix64 cameraYaw, Fix64 chargeTime, Fix64 cameraPitch)
     {
         if (!_isRunning || !_isWaitingForInput) return;

@@ -1,0 +1,46 @@
+客户端预测 vs 服务端权威  🔴 6.6m 漂移
+
+
+诊断报告：漂移根因
+🔴 Bug 1（致命）：本地玩家走错校正路径
+PlayerManager.lua:581-601
+
+
+-- 当前代码（错误）：
+if st ~= nil and st.targetPos ~= nil then
+    -- 路径 A：远程校正（仅重置位置）
+    st.targetPos = serverPos
+    st.prevPos   = serverPos
+    ...
+elseif player.transform ~= nil and not isHost then
+    -- 路径 B：本地 Reconciliation（回滚+重放）
+    self:_ReconcileReplayLocalInputs(player, PC)
+end
+客户端本地玩家（pid=2）永远进路径 A，因为 _interpState 一直在。路径 B 的回滚重放永远跳不到。本地玩家的未确认输入被丢弃，每次校正等于白做。
+
+🔴 Bug 2：路径 A 校正只修位置不修物理状态
+PlayerManager.lua:587-600
+
+校正时设置了 st.targetPos、st.prevPos、transform.position，但没有重置：
+
+player.velocity.y（垂直速度）
+player.isGrounded（着地状态）
+导致 _ApplyDeterministicMovement 用错的垂直速度算重力。
+
+数据验证
+客户端 vs 服务端 pid=2 的 XZ 平面速度对比（每 30 tick 平均）：
+
+区间  主机 per-tick 客户端 per-tick    差值
+210→240 0.143m  0.167m  +17%
+240→270 0.186m  0.167m  -10%
+270→300 0.131m  0.165m  +26%
+300→330 0.224m  0.260m  +16%
+360→390 0.136m  0.167m  +23%
+420→450 0.140m  0.166m  +19%
+主机速度随地形起伏变化（0.12~0.22m），客户端预测固执地维持 ~0.167m（=5m/s × 1/30s），这是未考虑地形的理想值。
+
+Y 轴漂移：
+
+
+tick=300: 客户端 Y=5.39m, 主机 Y=4.52m, 差 0.87m
+Y 轴差了 0.87m → isGrounded 判断不一致 → 重力/碰撞差异 → 水平位移也偏移 → 越积越多。
