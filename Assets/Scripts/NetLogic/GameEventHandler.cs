@@ -36,7 +36,9 @@ public class GameEventHandler
     // ★ 游戏总时长（秒）
     private static readonly Fix64 GameDuration = Fix64.FromFloat(127f);
     // ★ 初始 HP
-    private const int InitialHP = 3;
+    private const int InitialHP = 100;
+    private const int DamageMin = 7;
+    private const int DamageMax = 20;  // Next(min, max) 返回 [min, max)，所以 21 → [7, 20]
     // ★ 掉落比例
     private static readonly Fix64 DropRatio = Fix64.FromFloat(0.3f);
 
@@ -50,6 +52,10 @@ public class GameEventHandler
 
     // --- 计时器 ---
     private Fix64 _elapsed;           // 对局已过时间
+
+    // --- 死亡计时器（3 秒后重生）---
+    private Dictionary<int, Fix64> _deathTimers = new();
+    private static readonly Fix64 DeathDelay = Fix64.FromFloat(3.0f);
 
     // --- 区域生成 ---
     private struct SpawnZone
@@ -114,6 +120,7 @@ public class GameEventHandler
         _playerHPs.Clear();
         _playerBirthPos.Clear();
         _playerLastPos.Clear();
+        _deathTimers.Clear();
 
         // ★ 延迟到 GameScene 加载后再扫描 CrystalSpawnZone
         //   Tick 在场景切换期间就会开始运行，EnsureZonesInitialized 会重试直到对象可用
@@ -166,6 +173,21 @@ public class GameEventHandler
         {
             OnTimerEnd();
             return;
+        }
+
+        // === 死亡计时器：3 秒后重生 ===
+        if (_deathTimers.Count > 0)
+        {
+            var deadPlayers = new List<int>(_deathTimers.Keys);
+            foreach (int pid in deadPlayers)
+            {
+                _deathTimers[pid] += deltaTime;
+                if (_deathTimers[pid] >= DeathDelay)
+                {
+                    _deathTimers.Remove(pid);
+                    RespawnPlayer(pid);
+                }
+            }
         }
 
         // === 每秒广播倒计时 ===
@@ -370,38 +392,38 @@ public class GameEventHandler
             playerId, crystalId, _playerHoldings[playerId], newScore));
     }
 
-    /// <summary>处理玩家受击</summary>
+    /// <summary>处理玩家受击（服务端权威：生成随机伤害、更新 HP、广播结果）</summary>
     public void HandlePlayerHit(PlayerHit request)
     {
-        int attackId = request.AttackerId;
+        int attackerId = request.AttackerId;
         int victimId = request.VictimId;
-        int droppedCount = request.DroppedCount;
 
         if (!_playerHPs.ContainsKey(victimId)) return;
+        if (_playerHPs[victimId] <= 0) return;  // 已死亡，忽略
 
-        _playerHPs[victimId]--;
+        // ★ 服务端权威随机伤害 7-20
+        int damage = _rng.Next(DamageMin, DamageMax + 1);  // [7, 21) → [7, 20]
+        int newHp = Mathf.Max(0, _playerHPs[victimId] - damage);
+        _playerHPs[victimId] = newHp;
 
-        // 掉落晶石 → 扣持有数
-        if (_playerHoldings.ContainsKey(victimId))
-        {
-            _playerHoldings[victimId] = Mathf.Max(0, _playerHoldings[victimId] - droppedCount);
-        }
-
+        // ★ 广播权威结果（含 damage 和 new_hp）
         var hit = new PlayerHit
         {
-            AttackerId = attackId,
+            AttackerId = attackerId,
             VictimId = victimId,
-            DroppedCount = droppedCount,
+            DroppedCount = 0,       // 普通受击不掉水晶（死亡时由 HandlePlayerDeath 处理）
+            Damage = damage,
+            NewHp = newHp,
         };
         _host.BroadcastToAll(new NetMessage { PlayerHit = hit });
-        // ★ 主机本地也需要处理受击（更新 HP + 分数）
+        // ★ 主机本地也需要处理受击（更新 HP + 播放动画）
         EventCenter.Dispatch(32, hit);
 
-        Debug.Log("【GameEventHandler】玩家" + victimId + "受击 掉落" + droppedCount +
-                  "颗 HP:" + _playerHPs[victimId]);
+        Debug.Log($"[GameEventHandler] 玩家{victimId}受击 攻击者{attackerId} 伤害={damage} HP={newHp}/{InitialHP}");
 
-        if (_playerHPs[victimId] <= 0)
-            HandlePlayerDeath(victimId, attackId);
+        // ★ 死亡判定
+        if (newHp <= 0)
+            HandlePlayerDeath(victimId, attackerId);
     }
 
     /// <summary>处理玩家坠落</summary>
@@ -464,6 +486,9 @@ public class GameEventHandler
     /// </summary>
     private void HandlePlayerDeath(int playerId, int killerId)
     {
+        // ★ 防止重复死亡（已在死亡计时器中等待重生）
+        if (_deathTimers.ContainsKey(playerId)) return;
+
         Debug.Log("【GameEventHandler】玩家" + playerId + "死亡" +
                   (killerId > 0 ? " 击杀者:" + killerId : " 跌落死亡"));
 
@@ -511,7 +536,18 @@ public class GameEventHandler
         // ★ 主机本地也需要处理掉落事件（更新分数）
         EventCenter.Dispatch(39, dropMsg);
 
-        // --- 重生：重置HP，回到出生点 ---
+        // ★ 启动死亡计时器（3 秒后重生，不再立即重生）
+        _deathTimers[playerId] = Fix64.Zero;
+
+        Debug.Log(string.Format("【GameEventHandler】玩家{0}死亡 掉落{1}颗（持有{2}→{3}）分数={4} 3秒后重生",
+            playerId, dropCount, holding, _playerHoldings[playerId], newScore));
+    }
+
+    /// <summary>
+    /// 重生玩家：重置HP，发送 PlayerRespawn 广播
+    /// </summary>
+    private void RespawnPlayer(int playerId)
+    {
         _playerHPs[playerId] = InitialHP;
         Vector3 birthPos = _playerBirthPos.TryGetValue(playerId, out Vector3 bp)
             ? bp : Vector3.zero;
@@ -524,11 +560,14 @@ public class GameEventHandler
             PosZ = Fix64.FromFloat(birthPos.z).Raw,
         };
         _host.BroadcastToAll(new NetMessage { PlayerRespawn = respawn });
-        // ★ 主机本地也需要处理重生（移动玩家到出生点）
-        EventCenter.Dispatch(35, respawn);
+        // ★ 直接调 Lua 回调，不用 EventCenter.Dispatch(35)。
+        //   Dispatch(35) 会同时触发 HostServer.OnPlayerRespawn → HandlePlayerRespawn → 再次 Dispatch → ∞ 递归
+        LuaEventBridge.OnPlayerRespawn?.Invoke(respawn);
 
-        Debug.Log(string.Format("【GameEventHandler】玩家{0}掉落{1}颗（持有{2}→{3}）分数={4} 重生HP={5}",
-            playerId, dropCount, holding, _playerHoldings[playerId], newScore, InitialHP));
+        Vector3 deathPos = _playerLastPos.TryGetValue(playerId, out Vector3 dp) ? dp : Vector3.zero;
+        Debug.Log($"[GameEventHandler] 玩家{playerId}重生 HP={InitialHP} " +
+                  $"出生点=({birthPos.x:F2},{birthPos.y:F2},{birthPos.z:F2}) " +
+                  $"死亡点=({deathPos.x:F2},{deathPos.y:F2},{deathPos.z:F2})");
     }
 
     #endregion
@@ -599,6 +638,7 @@ public class GameEventHandler
     public void SetPlayerBirthPos(int playerId, float x, float y, float z)
     {
         _playerBirthPos[playerId] = new Vector3(x, y, z);
+        Debug.Log($"[GameEventHandler] 写入出生点 playerId={playerId} pos=({x:F2}, {y:F2}, {z:F2})");
     }
 
     /// <summary>报告玩家位置（Lua 每帧调用，用于死亡掉落位置）</summary>

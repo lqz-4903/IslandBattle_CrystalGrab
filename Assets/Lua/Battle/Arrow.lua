@@ -49,6 +49,11 @@ function Arrow.Init()
         Arrow._updateId = RegisterUpdate(Arrow.OnUpdate)
         print("[Arrow] Update 已注册, id=" .. Arrow._updateId)
     end
+
+    -- ★ 注册 C# ArrowTrigger 回调 → Lua（SetCallback+LuaFunction，避免 Action<T1,T2> 需 CSharpCallLua 注册）
+    CS.ArrowTrigger.SetCallback(function(arrowGo, targetPlayerId)
+        Arrow.OnTriggerEnterPlayer(arrowGo, targetPlayerId)
+    end)
 end
 
 -- ========== 发射接口 ==========
@@ -90,17 +95,36 @@ function _createArrow(ownerId, spawnPos, forward, speed, lifetime)
     go.transform.position = spawnPos
     go.transform.forward = forward
 
-    -- ★ 禁用所有 Collider，避免意外物理碰撞（问题 10）
-    --    Phase 2 改为 IsTrigger=true 以支持 Trigger 受击检测
-    local colliders = go:GetComponentsInChildren(typeof(CS.UnityEngine.Collider))
-    for i = 0, colliders.Length - 1 do
-        colliders[i].enabled = false
+    -- ★ Phase 2：动态添加 Trigger 碰撞检测组件（最小化物理介入）
+    --   CapsuleCollider(isTrigger) — 沿飞行方向拉长防隧道
+    --   Rigidbody(kinematic)       — 仅为了让 Trigger 检测生效，不做物理模拟
+    --   ArrowTrigger               — OnTriggerEnter → 回调 Lua
+    local capsule = go:GetComponent(typeof(CS.UnityEngine.CapsuleCollider))
+    if IsNull(capsule) then
+        capsule = go:AddComponent(typeof(CS.UnityEngine.CapsuleCollider))
+    end
+    capsule.isTrigger = true
+    capsule.radius = 0.15
+    capsule.height = 1.5         -- 沿 Z 轴拉长，覆盖高速飞行的物理步位移
+    capsule.direction = 2        -- Z 轴（箭矢默认前向）
+
+    local rb = go:GetComponent(typeof(CS.UnityEngine.Rigidbody))
+    if IsNull(rb) then
+        rb = go:AddComponent(typeof(CS.UnityEngine.Rigidbody))
+    end
+    rb.isKinematic = true
+    rb.useGravity = false
+
+    local arrowTrigger = go:GetComponent(typeof(CS.ArrowTrigger))
+    if IsNull(arrowTrigger) then
+        go:AddComponent(typeof(CS.ArrowTrigger))
     end
 
     go:SetActive(true)
 
     local arrow = {
         go       = go,
+        rb       = rb,         -- ★ 缓存 Rigidbody 引用，飞行时用 MovePosition
         ownerId  = ownerId,
         forward  = forward,
         speed    = speed,
@@ -126,8 +150,9 @@ function Arrow.OnUpdate(dt)
             goto continue
         end
 
-        -- 飞行
-        arrow.go.transform.position = arrow.go.transform.position + arrow.forward * arrow.speed * dt
+        -- ★ 飞行：使用 Rigidbody.MovePosition 驱动物理引擎，使 Trigger 检测生效
+        local newPos = arrow.rb.position + arrow.forward * arrow.speed * dt
+        arrow.rb:MovePosition(newPos)
         arrow.elapsed = arrow.elapsed + dt
 
         -- ★ Phase 2 预留：Trigger 碰撞检测入口
@@ -164,6 +189,11 @@ function Arrow.OnTriggerEnterPlayer(arrowGo, targetPlayerId)
         end
     end
     if arrow == nil then
+        return
+    end
+
+    -- ★ 防自伤：跳过发射者自己（箭矢出生时 collider 可能与发射者重叠）
+    if arrow.ownerId == targetPlayerId then
         return
     end
 

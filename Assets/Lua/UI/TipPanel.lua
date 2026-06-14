@@ -24,14 +24,7 @@ end
 
 -- 关闭弹窗（销毁自身）
 function TipPanel:Close()
-    if self.panelObj ~= nil then
-        self:StopFade()
-        GameObject.Destroy(self.panelObj)
-        self.panelObj = nil
-        self.canvasGroup = nil
-        self.controls = {}
-        self.isInitEvent = false
-    end
+    self:DestroyPanel()
     self.instance = nil
 end
 

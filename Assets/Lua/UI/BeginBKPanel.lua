@@ -6,6 +6,8 @@ BeginBKPanel.panelName = "BeginBKPanel"
 
 -- 单例引用
 BeginBKPanel.instance = nil
+-- 背景面板不需要遮罩
+BeginBKPanel.useMask = false
 
 -- 显示面板（启动时调用）
 function BeginBKPanel:Show()
@@ -18,15 +20,7 @@ end
 
 -- 隐藏并销毁面板（切场景时调用）
 function BeginBKPanel:Hide()
-    if self.panelObj ~= nil then
-        -- 停止所有动画
-        self:StopFade()
-        -- 销毁面板对象
-        GameObject.Destroy(self.panelObj)
-        self.panelObj = nil
-        self.canvasGroup = nil
-        self.controls = {}
-    end
+    self:DestroyPanel()
     self.instance = nil
 end
 

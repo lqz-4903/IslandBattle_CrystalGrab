@@ -12,10 +12,6 @@ function Random.new(seed)
     return o
 end
 
-function Random:next(max)
-    return self._cs:Next(max)
-end
-
 function Random:nextRange(min, max)
     return self._cs:Next(min, max)
 end

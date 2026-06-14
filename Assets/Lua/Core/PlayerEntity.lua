@@ -88,16 +88,6 @@ function PlayerEntity:ApplyInput(input)
     self.isAttacking  = input.Attack
     self.isUsingSkill = input.Skill
 
-    -- ★★★ 诊断：打印原始输入值（前 5 tick + 每 30 tick）★★★
-    local pm = require("Core.PlayerManager").GetInstance()
-    if pm.frameCount <= 5 or pm.frameCount % 30 == 0 then
-        local isHost = CS.HostServer.Instance ~= nil and CS.HostServer.Instance.IsGameStarted
-        local hostTag = isHost and "HOST" or "CLIENT"
-        print(string.format("[PE] ApplyInput #%d %s pid=%d tick=%d md=%d yawRaw=%d",
-            pm.frameCount, hostTag, input.PlayerId, input.Tick,
-            input.MoveDir, input.CameraYaw))
-    end
-
     -- 朝向：服务端权威 yaw（proto 中为 sfixed64，C# 属性为 long = Fix64.Raw）
     -- ★ GC优化：原地更新 raw 值，避免每次 tick new Fix64 table
     if self.yaw == nil then
@@ -153,19 +143,6 @@ function PlayerEntity:SyncTransform()
     end
 end
 
---- 获取用于射线检测/拾取的视线方向
-function PlayerEntity:GetLookDirection()
-    local yawFloat = Fix64.toFloat(self.yaw)
-    local pitchFloat = Fix64.toFloat(self.pitch)
-    -- 从 yaw/pitch 计算方向向量
-    local dir = CS.UnityEngine.Vector3(
-        math.sin(yawFloat) * math.cos(pitchFloat),
-        -math.sin(pitchFloat),
-        math.cos(yawFloat) * math.cos(pitchFloat)
-    )
-    return dir
-end
-
 --- 获取 Unity 世界坐标（用于渲染/物理）
 function PlayerEntity:GetUnityPosition()
     return Vec3.toUnity(self.position)
@@ -185,6 +162,8 @@ function PlayerEntity:TakeDamage(newHp)
     self.hp = newHp
     if self.hp <= 0 then
         self.isAlive = false
+        -- ★ 播放死亡动画（所有客户端）
+        self:_PlayDeadAnimation()
     end
     -- 通知 UI 更新
     if self.isLocal then
@@ -204,6 +183,8 @@ end
 function PlayerEntity:Respawn(hp)
     self.hp = hp or GC.DEFAULT_HP
     self.isAlive = true
+    -- ★ 重置死亡动画
+    self:_SetDeadAnimation(false)
     -- ★ 使用 Vec3.zero() 替代 Vec3.ZERO：每个分量是独立的 Fix64.new(0)，后续 .raw 写入不会污染全局 Fix64.ZERO
     self.velocity = Vec3.zero()
     if self.isLocal then
@@ -260,17 +241,85 @@ function PlayerEntity:_GetArrowPointPos()
     return self.transform.position + CS.UnityEngine.Vector3(0, 1.2, 0)
 end
 
---- 被箭矢命中时调用（Phase 2 预留）
---- ★ Phase 2：Trigger 触发 → Arrow.onHitPlayer → 此处
+--- 被箭矢命中时调用（Trigger 触发 → Arrow.onHitPlayer → 此处）
 --- @param ownerId int — 攻击者玩家 ID
 --- @param hitPoint UnityEngine.Vector3 — 命中点世界坐标（用于特效定位）
 function PlayerEntity:OnHitByArrow(ownerId, hitPoint)
-    -- ★ Phase 2 实现：
-    -- 1. 播放受击动画（Animator.SetTrigger("Hit")）
-    -- 2. 在 hitPoint 处播放受击粒子特效
-    -- 3. 播放受击音效
-    -- 4. 屏幕闪红（仅本地玩家）
-    -- 5. HP 扣减由服务端 PlayerHit 消息单独驱动（不在此处处理）
+    -- 1. 播放受击动画（本地预览，不等服务端确认）
+    self:_PlayHurtAnimation()
+
+    -- 2. 发送 PlayerHit 到服务端（服务端权威判定伤害值）
+    self:_SendPlayerHitToServer(ownerId)
+end
+
+-- 播放受击动画
+function PlayerEntity:_PlayHurtAnimation()
+    self:_GetOrCacheAnimator()
+    local anim = self._animatorCached
+    if anim ~= nil and not IsNull(anim) then
+        anim:SetTrigger("IsHurt")
+    end
+end
+
+-- 设置死亡动画状态（true=死亡, false=复活）
+function PlayerEntity:_SetDeadAnimation(isDead)
+    self:_GetOrCacheAnimator()
+    local anim = self._animatorCached
+    if anim ~= nil and not IsNull(anim) then
+        if isDead then
+            anim:SetBool("Dead", true)
+        else
+            -- ★ Dead 状态（KnockDown_RF01_Anim）没有退出过渡，SetBool(false) 不会让状态机离开 Dead。
+            --   使用 CrossFadeInFixedTime 强制过渡到 Move（默认 locomotion 混合树状态）。
+            --   0.1s 固定过渡时长确保复活动画不会突兀闪现。
+            anim:SetBool("Dead", false)
+            anim:CrossFadeInFixedTime("Move", 0.1, 0)
+            anim:SetFloat("HSpeed", 0)
+            anim:SetFloat("VSpeed", 0)
+            -- ★ 重置所有动画 Bool/Trigger，避免残留状态（Jump/Roll/Fire/Skill/IsHurt）
+            anim:SetBool("Jump", false)
+            anim:SetBool("Roll", false)
+            anim:SetBool("Fire", false)
+            anim:SetBool("Skill", false)
+            anim:ResetTrigger("IsHurt")
+        end
+    end
+end
+
+-- 播放死亡动画
+function PlayerEntity:_PlayDeadAnimation()
+    self:_SetDeadAnimation(true)
+end
+
+-- 获取或缓存 Animator 引用
+function PlayerEntity:_GetOrCacheAnimator()
+    if self._animatorCached == nil and self.gameObject ~= nil and not IsNull(self.gameObject) then
+        self._animatorCached = self.gameObject:GetComponentInChildren(typeof(CS.UnityEngine.Animator))
+    end
+end
+
+-- 发送受击消息到服务端
+function PlayerEntity:_SendPlayerHitToServer(attackerId)
+    local hitMsg = CS.GameProto.PlayerHit()
+    hitMsg.AttackerId = attackerId
+    hitMsg.VictimId = self.playerId
+    hitMsg.DroppedCount = 0  -- 普通受击不掉水晶
+
+    local envelope = CS.GameProto.NetMessage()
+    envelope.PlayerHit = hitMsg
+
+    -- 判断主机/客户端模式
+    local hostServer = CS.HostServer.Instance
+    if hostServer ~= nil and hostServer.IsGameStarted then
+        -- 主机模式：直接调用服务端处理
+        hostServer:SubmitHostPlayerHit(hitMsg)
+    else
+        -- 客户端模式：发送网络消息
+        local netMgr = CS.NetMgr.Instance
+        if netMgr ~= nil then
+            netMgr:Send(envelope)
+        end
+    end
 end
 
 -- ========== 销毁 ==========

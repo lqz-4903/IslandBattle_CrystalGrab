@@ -224,13 +224,8 @@ public class TickSyncHandler
         {
             _currentTickInputs[kvp.Key] = kvp.Value;
         }
-        int earlyCount = _earlyInputs.Count;
         _earlyInputs.Clear();
 
-        // ★ 每 tick 输出诊断信息（前 5 tick + 每 30 tick）
-        if (_currentTick <= 5 || _currentTick % 30 == 0)
-            Debug.Log(string.Format("[TickSync] BeginTick={0} earlyInputs={1} waitingForInputs",
-                _currentTick, earlyCount));
     }
 
     /// <summary>
@@ -247,8 +242,6 @@ public class TickSyncHandler
             Tick = _currentTick
         };
 
-        // ★ 前 5 tick + 每 30 tick 输出帧组装信息
-        bool shouldLog = _currentTick <= 5 || _currentTick % 30 == 0;
         int receivedCount = 0, emptyCount = 0;
 
         foreach (int playerId in _activePlayers)
@@ -298,10 +291,6 @@ public class TickSyncHandler
 
             inputTick.Inputs.Add(input);
         }
-
-        if (shouldLog)
-            Debug.Log(string.Format("[TickSync] FinalizeTick={0} recv={1} empty={2}",
-                _currentTick, receivedCount, emptyCount));
 
         // 清空上一 tick 位置（仅使用一次）
         _previousTickPositions.Clear();

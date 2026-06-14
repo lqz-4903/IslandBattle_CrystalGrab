@@ -177,7 +177,9 @@ message CrystalPickup{
 message PlayerHit{
 	int32 attacker_id		= 1;
 	int32 victim_id			= 2;
-	int32 dropped_count = 3;		// 掉了几颗晶石
+	int32 dropped_count = 3;		// 掉了几颗晶石（保留兼容，死亡时由服务端填）
+	int32 damage        = 4;		// ★ 本次伤害值
+	int32 new_hp        = 5;		// ★ 受击后受害者的 HP
 }
 
 // 33

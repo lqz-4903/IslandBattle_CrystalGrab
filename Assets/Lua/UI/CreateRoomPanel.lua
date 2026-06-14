@@ -423,14 +423,7 @@ function CreateRoomPanel:Hide()
     self:_unregisterPlayerOfflineCallback()
     self:_unregisterGameStartCallback()
 
-    if self.panelObj ~= nil then
-        self:StopFade()
-        GameObject.Destroy(self.panelObj)
-        self.panelObj = nil
-        self.canvasGroup = nil
-        self.controls = {}
-        self.isInitEvent = false
-    end
+    self:DestroyPanel()
     self.btnStartGame = nil
     self.instance = nil
 end

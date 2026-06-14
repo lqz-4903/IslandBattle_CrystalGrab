@@ -6,6 +6,8 @@ GamePanel.panelName = "GamePanel"
 
 -- 单例引用
 GamePanel.instance = nil
+-- GamePanel是GameScene唯一底层面板，不需要遮罩
+GamePanel.useMask = false
 
 -- 血量相关
 GamePanel.maxHP = 100
@@ -33,14 +35,7 @@ end
 -- 隐藏并销毁面板
 function GamePanel:Hide()
     self:StopTimer()
-    if self.panelObj ~= nil then
-        self:StopFade()
-        GameObject.Destroy(self.panelObj)
-        self.panelObj = nil
-        self.canvasGroup = nil
-        self.controls = {}
-        self.isInitEvent = false
-    end
+    self:DestroyPanel()
     self.instance = nil
     self.bloodInited = false
 end
@@ -80,12 +75,6 @@ function GamePanel:UpdateBloodDisplay()
         local newW = self.curHP / self.maxHP * self.hpW
         rect.sizeDelta = Vector2(newW, rect.sizeDelta.y)
     end
-end
-
--- 扣血（外部调用：GamePanel:TakeDamage(10)）
-function GamePanel:TakeDamage(amount)
-    self.curHP = self.curHP - amount
-    self:UpdateBloodDisplay()
 end
 
 -- 更新得分（外部调用：GamePanel:UpdateScore(500)）
@@ -159,8 +148,6 @@ end
 -- 倒计时结束回调
 function GamePanel:OnTimerEnd()
     print("游戏时间结束！")
-    -- 先实例化遮罩，阻止UI穿透到下层GamePanel
-    GameOverPanel:CreateMask()
-    -- 再弹出游戏结束界面，保证GameOverPanel最后渲染（在最上层）
+    -- ★ BasePanel.Init 会自动创建遮罩，直接弹出即可
     GameOverPanel:Popup()
 end

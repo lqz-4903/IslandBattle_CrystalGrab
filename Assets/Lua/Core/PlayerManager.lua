@@ -65,8 +65,8 @@ function PlayerManager:Init()
         self:ApplyFrameInput(input)
     end
 
-    TickExecutor.OnAfterTickExecuted = function(tick)
-        self:OnFrameEnd(tick)
+    TickExecutor.OnAfterTickExecuted = function()
+        self:OnFrameEnd()
     end
 
     -- ★ 注册 LateUpdate 渲染层（在所有 Update/TickExecutor 物理回退之后执行）
@@ -191,6 +191,7 @@ function PlayerManager:SpawnAllPlayers(playerList, localPlayerId)
     end
 
     self.localPlayerId = localPlayerId
+    self._spawnYaws = {}   -- ★ 缓存出生朝向，供重生时恢复
 
     local totalPlayers = playerList.Players.Count
     print("[PlayerManager] 开始生成 " .. totalPlayers .. " 名玩家，本地 ID=" .. localPlayerId)
@@ -243,9 +244,17 @@ function PlayerManager:SpawnAllPlayers(playerList, localPlayerId)
         cc.stepOffset = 0.3     -- 允许自动上小台阶（不触发跳跃动画）
         cc.slopeLimit = 45      -- 45° 斜坡限制
         player.controller = cc
+
+        -- ★ 挂载 PlayerTag 组件（ArrowTrigger 碰撞检测用）
+        local playerTag = go:GetComponent(typeof(CS.PlayerTag))
+        if IsNull(playerTag) then
+            playerTag = go:AddComponent(typeof(CS.PlayerTag))
+        end
+        playerTag.PlayerId = playerId
         -- ★ 修复 Bug1（飞天）：先设置 yaw 再设置 position
         --   SetPosition → SyncTransform 内部读取 self.yaw 计算旋转，必须先初始化 yaw。
         player:SetYaw(spawnYaw)
+        self._spawnYaws[playerId] = spawnYaw  -- ★ 缓存出生朝向供重生使用
         player:SetPosition(spawnPos.x, spawnPos.y, spawnPos.z)
         -- ★ 修复 Bug1（飞天）：读取 CharacterController 实际着地状态
         --   PlayerEntity.new 默认 isGrounded=true，但 CC 可能实际未着地（生成点高于地形）。
@@ -369,16 +378,6 @@ function PlayerManager:GetLocalPlayer()
     return self.players[self.localPlayerId]
 end
 
-function PlayerManager:GetAlivePlayers()
-    local alive = {}
-    for id, player in pairs(self.players) do
-        if player.isAlive then
-            alive[id] = player
-        end
-    end
-    return alive
-end
-
 function PlayerManager:GetPlayerCount()
     local count = 0
     for _ in pairs(self.players) do count = count + 1 end
@@ -445,22 +444,15 @@ function PlayerManager:ApplyFrameInput(input)
     end
 end
 
-function PlayerManager:OnFrameEnd(tick)
+function PlayerManager:OnFrameEnd()
     self.frameCount = self.frameCount + 1
-
-    -- ★ 诊断：前 5 帧 + 每 30 帧输出，确认 OnFrameEnd 被执行
-    if self.frameCount <= 5 or self.frameCount % 30 == 0 then
-        local hostTag = (CS.HostServer.Instance ~= nil and CS.HostServer.Instance.IsGameStarted) and "HOST" or "CLIENT"
-        print(string.format("[PM] OnFrameEnd #%d tick=%d %s players=%d",
-            self.frameCount, tick.Tick, hostTag, self:GetPlayerCount()))
-    end
 
     local isHost = (CS.HostServer.Instance ~= nil and CS.HostServer.Instance.IsGameStarted)
 
     -- ★ 客户端：先应用服务端权威位置校正，再执行物理
     --   校正 → 物理从正确位置出发 → 位移准确 → bug 2/3 一并解决
     if not isHost then
-        self:_ApplyServerPositionCorrection(tick.Tick)
+        self:_ApplyServerPositionCorrection()
     end
 
     -- ★ 对所有玩家执行确定性移动（统一 30fps 物理）
@@ -481,9 +473,6 @@ function PlayerManager:OnFrameEnd(tick)
         self:_CaptureAuthPositions()
     end
 
-    if self.frameCount % 75 == 0 then
-        print("[PlayerManager] 帧 " .. tick.Tick .. " 已执行，活跃玩家 " .. self:GetPlayerCount())
-    end
 end
 
 -- 远程玩家插值更新 ID（在 Init 中注册，Shutdown 中注销）
@@ -492,8 +481,6 @@ PlayerManager._interpUpdateId = nil
 -- =============================================
 -- 主机端权威位置捕获
 -- =============================================
-PlayerManager._capDebugCounter = 0   -- 主机端：捕获日志计数
-
 --- 主机端：捕获所有玩家在 tick 执行后的物理位置。
 --- 位置经 Fix64.Raw 转换后提交给 C# TickSyncHandler，附加到下一 tick 的 InputTick 中。
 --- ★ 统一路径：所有玩家（含主机本地）从 _interpState.targetPos 读取（物理终点）。
@@ -533,36 +520,16 @@ function PlayerManager:_CaptureAuthPositions()
         ::continue_cap::
     end
 
-    -- 调试：每秒（75 tick）打印一次捕获统计
-    self._capDebugCounter = self._capDebugCounter + 1
-    if self._capDebugCounter % 75 == 0 and captureCount > 0 then
-        -- 打印第一个玩家的位置作为样本
-        local samplePlayer = nil
-        for _, p in pairs(self.players) do samplePlayer = p; break end
-        if samplePlayer ~= nil and samplePlayer.transform ~= nil then
-            local sp = samplePlayer.transform.position
-            print(string.format("[PlayerManager] 捕获#%d 玩家数=%d 样本[玩家%d]=(%.2f,%.2f,%.2f)",
-                self._capDebugCounter, captureCount,
-                samplePlayer.playerId, sp.x, sp.y, sp.z))
-        end
-    end
 end
 
 -- =============================================
--- 客户端权威位置校正（硬回滚）
+-- 客户端权威位置校正
 -- =============================================
 --- ★ 在 _ApplyDeterministicMovement 之前调用，确保物理从正确位置出发。
+---   校正 st.targetPos/st.prevPos 为服务端权威位置，
+---   后续 _ApplyDeterministicMovement 从校正位置出发执行物理。
 ---
---- 两种校正路径：
----   A) 远程玩家（有 _interpState）：校正 st.targetPos/st.prevPos，
----      后续 _ApplyDeterministicMovement 从校正位置出发执行物理。
----   B) 客户端本地玩家（无 _interpState，60fps 预测驱动）：
----      直接校正 transform.position，下一帧 _ApplyLocalMovement 从校正位置继续。
----
---- @param tick int — 当前 tick
-function PlayerManager:_ApplyServerPositionCorrection(tick)
-    -- 调用方已确保 not isHost，此处保留用于路径 B 的防护判断
-    local isHost = false
+function PlayerManager:_ApplyServerPositionCorrection()
     for _, player in pairs(self.players) do
         -- ★ GC优化：用标志位代替 nil，避免每次校正后重新分配 _serverAuthPos 表
         if not player._hasServerAuthPos then goto continue_corr end
@@ -593,54 +560,6 @@ function PlayerManager:_ApplyServerPositionCorrection(tick)
                     player.transform.position = serverPos
                 end
 
-                if tick % 75 == 0 then
-                    print(string.format(
-                        "[PlayerManager] 校正[远程] 玩家%d drift=%.3fm → 已同步到服务端位置",
-                        player.playerId, drift))
-                end
-            end
-
-        elseif player.transform ~= nil and not isHost then
-            -- ==== 路径 B：客户端本地玩家 — 回滚 + 输入重放（Reconciliation）====
-            -- 1. 确认服务端已消费的客户端输入
-            -- 2. 回滚到服务端权威位置
-            -- 3. 重放未确认的输入，从权威位置出发重新预测
-            local curPos = player.transform.position
-            local drift = (curPos - serverPos).magnitude
-            local threshold = GC.RECONCILE_THRESHOLD or 0.02
-
-            if drift > threshold then
-                -- ★ 已消费的 tick 已在 ApplyFrameInput 中通过 AcknowledgeUpTo 清理。
-                --   此处只需回滚 + 重放未确认的未来 tick（> echoTick），
-                --   _ApplyDeterministicMovement 会应用当前 tick 的输入（= echoTick）。
-                local echoTick = player._serverEchoedTick or 0
-                local PC = require("Battle.PlayerController")
-
-                -- ★ 回滚到服务端权威位置
-                player.transform.position = serverPos
-                -- ★ GC优化：原地更新 position，避免 new Vec3 + 3 Fix64.fromFloat
-                if player.position == Vec3.ZERO then
-                    player.position = Vec3.zero()
-                end
-                player.position.x.raw = CS.Fix64.FromFloat(serverPos.x).Raw
-                player.position.y.raw = CS.Fix64.FromFloat(serverPos.y).Raw
-                player.position.z.raw = CS.Fix64.FromFloat(serverPos.z).Raw
-
-                -- ★ 回滚后同步着地状态（防止第一帧重放用错 isGrounded）
-                if player.controller ~= nil and not IsNull(player.controller) then
-                    player.isGrounded = player.controller.isGrounded
-                end
-
-                -- ★ 重放未确认的输入，从服务端位置出发重新预测
-                self:_ReconcileReplayLocalInputs(player, PC)
-
-                if tick % 75 == 0 then
-                    -- ★ GC优化：用 GetUnackedCount 代替 #GetUnackedInputs()，避免仅为了调试日志创建完整 table
-                    local unackedCount = PC:GetUnackedCount()
-                    print(string.format(
-                        "[PlayerManager] 校正[本地] 玩家%d drift=%.3fm → 回滚+重放%d帧 (echoTick=%d)",
-                        player.playerId, drift, unackedCount, echoTick))
-                end
             end
         end
 
@@ -648,138 +567,7 @@ function PlayerManager:_ApplyServerPositionCorrection(tick)
     end
 end
 
--- =============================================
--- 客户端本地玩家预测-校正：输入重放
--- =============================================
---- 从服务端权威位置出发，重放所有未确认的输入，重新预测当前位置。
---- 原理：服务端权威位置 = "正确的过去"，未确认输入 = "客户端已发送但服务端尚未处理的未来"，
----       重放这些输入 = 从正确的过去推导出最准确的当前预测位置。
---- @param player PlayerEntity — 本地玩家
---- @param pc table — PlayerController 模块引用
-function PlayerManager:_ReconcileReplayLocalInputs(player, pc)
-    local unackedInputs = pc:GetUnackedInputs()
-    if #unackedInputs == 0 then return end
 
-    -- ★ 保存当前 tick 的输入（由 ApplyFrameInput 设置），重放结束后恢复，
-    --    避免 _ApplyDeterministicMovement 使用重放最后一帧的旧输入导致方向错误。
-    local savedMoveDir = player.moveDir
-    local savedYawRaw = player.yaw.raw
-    local savedJumping = player.isJumping
-
-    -- ★ GC优化：使用预缓存的 TICK_DT_F64
-
-    -- 逐帧重放未确认的输入
-    for _, entry in ipairs(unackedInputs) do
-        local data = entry.data
-        player.moveDir   = data.moveDir
-        -- ★ GC优化：原地更新 raw 值，避免每重放帧 Fix64.fromFloat 创建新表
-        player.yaw.raw = CS.Fix64.FromFloat(data.yaw).Raw
-        player.isJumping = data.jump or false
-
-        self:_ReplayDeterministicStep(player, TICK_DT_F64)
-    end
-
-    -- ★ 恢复当前 tick 的输入，供后续 _ApplyDeterministicMovement 使用
-    player.moveDir = savedMoveDir
-    player.yaw.raw = savedYawRaw
-    player.isJumping = savedJumping
-
-    -- 同步最终位置到 Lua position 记录
-    if player.transform ~= nil and not IsNull(player.transform) then
-        local pos = player.transform.position
-        -- ★ GC优化：原地更新 position
-        if player.position == Vec3.ZERO then
-            player.position = Vec3.zero()
-        end
-        player.position.x.raw = CS.Fix64.FromFloat(pos.x).Raw
-        player.position.y.raw = CS.Fix64.FromFloat(pos.y).Raw
-        player.position.z.raw = CS.Fix64.FromFloat(pos.z).Raw
-
-        -- ★ 修复：确保 _interpState 已初始化，防止本地玩家校正后插值状态缺失
-        self:_InitInterpState(player)
-        player._interpState.targetPos = player.transform.position
-        player._interpState.prevPos   = player.transform.position
-        player._interpState.elapsed   = 0
-    end
-end
-
---- 回滚重放专用的单帧确定性物理。
---- 与 _ApplyDeterministicMovement 相同的物理逻辑，但不管理插值状态、不回退 Transform ——
---- 因为本地玩家由 60fps _ApplyLocalMovement 驱动渲染。
---- @param player PlayerEntity
---- @param dt Fix64 — tick 时间间隔
-function PlayerManager:_ReplayDeterministicStep(player, dt)
-    local controller = player.controller
-    if controller == nil or IsNull(controller) then return end
-
-    local dtFloat = Fix64.toFloat(dt)
-    local moveDir = player.moveDir
-    -- ★ 防御：player.yaw 改为 nil 初值，需容错
-    local yawFloat = player.yaw and Fix64.toFloat(player.yaw) or 0
-
-    -- 水平移动
-    local hVelocity = CS.UnityEngine.Vector3.zero
-    local dirMask = moveDir & 0x0F
-    local isRolling = (moveDir & GC.MOVE_ROLL) ~= 0
-
-    if dirMask ~= GC.MOVE_NONE then
-        local forward = CS.UnityEngine.Vector3(math.sin(yawFloat), 0, math.cos(yawFloat))
-        local right   = CS.UnityEngine.Vector3(math.cos(yawFloat), 0, -math.sin(yawFloat))
-        local dir = CS.UnityEngine.Vector3.zero
-        if dirMask & GC.MOVE_FORWARD ~= 0 then dir = dir + forward end
-        if dirMask & GC.MOVE_BACKWARD ~= 0 then dir = dir - forward end
-        if dirMask & GC.MOVE_RIGHT ~= 0 then dir = dir + right end
-        if dirMask & GC.MOVE_LEFT ~= 0 then dir = dir - right end
-        if dir.magnitude > 1 then dir = dir.normalized end
-        local speed = isRolling and 12 or GC.MOVE_SPEED
-        hVelocity = dir * speed
-    end
-
-    -- 垂直移动
-    local vertVelocity
-    local justJumped = false
-    if player.isGrounded then
-        if player.isJumping then
-            vertVelocity = GC.JUMP_FORCE
-            player.isGrounded = false
-            justJumped = true
-            player._jumpInitiated = true
-        else
-            vertVelocity = 0
-        end
-    else
-        vertVelocity = Fix64.toFloat(player.velocity.y) - GC.GRAVITY * dtFloat
-    end
-
-    -- 子步物理
-    local subSteps = GC.PHYSICS_SUBSTEPS or 4
-    local subDt = dtFloat / subSteps
-    local subDisp = CS.UnityEngine.Vector3(
-        hVelocity.x * subDt,
-        vertVelocity * subDt,
-        hVelocity.z * subDt
-    )
-    for _ = 1, subSteps do
-        local ok = pcall(controller.Move, controller, subDisp)
-        if not ok then break end
-    end
-
-    -- 更新着地状态（刚起跳时不检测，防止首帧取消跳跃）
-    if not justJumped then
-        if not IsNull(controller) then
-            player.isGrounded = controller.isGrounded
-        end
-    end
-
-    -- 更新速度
-    -- ★ GC优化：原地更新 velocity
-    if player.velocity == Vec3.ZERO then
-        player.velocity = Vec3.zero()
-    end
-    player.velocity.x.raw = CS.Fix64.FromFloat(hVelocity.x).Raw
-    player.velocity.y.raw = CS.Fix64.FromFloat(vertVelocity).Raw
-    player.velocity.z.raw = CS.Fix64.FromFloat(hVelocity.z).Raw
-end
 
 -- =============================================
 -- 远程玩家插值系统（消除 30fps tick → 60fps 渲染的卡顿）
@@ -1007,16 +795,6 @@ function PlayerManager:_ApplyDeterministicMovement(player, dt, isHost)
         st.hasTarget = true
         st.elapsed = 0  -- ★ 重置插值计时器
 
-        -- ★★★ 诊断：前 5 tick + 每 30 tick 打印每个玩家的位置变化 ★★★
-        if self.frameCount <= 5 or self.frameCount % 30 == 0 then
-            local tag = (player.playerId == self.localPlayerId) and "LOCAL" or "REMOTE"
-            local delta = (st.targetPos - st.prevPos).magnitude
-            print(string.format("[PM] Move #%d tick=%d pid=%d %s moveDir=%d yaw=%.1fdeg isGnd=%s delta=%.3fm pos=(%.2f,%.2f,%.2f)",
-                self.frameCount, self.frameCount, player.playerId, tag,
-                moveDir, yawDeg, tostring(player.isGrounded), delta,
-                st.targetPos.x, st.targetPos.y, st.targetPos.z))
-        end
-
         -- ★ 本地玩家：保持在 targetPos（最新物理位置），不倒退
         --   跳过插值延迟，摄像机跟随即时位置，输入响应更跟手
         --   远程玩家：倒退到 prevPos，60fps 插值器在接下来 1/30s 内平滑驱动到 targetPos
@@ -1077,11 +855,24 @@ end
 
 -- ========== 服务端权威状态同步 ==========
 
-function PlayerManager:OnServerPlayerHit(attackerId, victimId, droppedCount, newHp)
+function PlayerManager:OnServerPlayerHit(attackerId, victimId, damage, newHp)
     local victim = self.players[victimId]
     if victim == nil then return end
-    victim:TakeDamage(newHp or (victim.hp - 1))
-    print("[PlayerManager] 玩家 " .. victimId .. " 受击 HP=" .. victim.hp)
+
+    -- 1. 更新 HP
+    victim:TakeDamage(newHp or (victim.hp - (damage or 1)))
+
+    -- 2. 播放受击动画（所有客户端，Trigger 自动消费）
+    if victim._animatorCached == nil and victim.gameObject ~= nil and not IsNull(victim.gameObject) then
+        victim._animatorCached = victim.gameObject:GetComponentInChildren(typeof(CS.UnityEngine.Animator))
+    end
+    local anim = victim._animatorCached
+    if anim ~= nil and not IsNull(anim) then
+        anim:SetTrigger("IsHurt")
+    end
+
+    print(string.format("[PlayerManager] 玩家%d受击 伤害=%d HP=%d/%d",
+        victimId, damage or 0, victim.hp, victim.maxHp))
 end
 
 function PlayerManager:OnServerPlayerFall(playerId, droppedCount, newHp)
@@ -1094,19 +885,104 @@ end
 function PlayerManager:OnServerPlayerRespawn(playerId, posX, posY, posZ, hp)
     local player = self.players[playerId]
     if player == nil then return end
-    player:Respawn(hp)
-    -- posX/Y/Z 现在是 sfixed64 → long = Fix64.Raw，用 Fix64.new() 而非 fromFloat()
-    player:SetPosition(
-        Fix64.new(posX),
-        Fix64.new(posY),
-        Fix64.new(posZ)
-    )
-    -- ★ 重置远程玩家的插值状态，避免从死亡位置 warp 到重生位置
-    --   同时清除缓存的 Animator 引用，重生后重新查找（防御性）
-    if player.playerId ~= self.localPlayerId then
-        player._interpState = nil
-        player._animatorCached = nil
+    -- ★ 销毁旧对象，重新实例化（彻底清除残留状态）
+    -- 保存需要跨重生保留的状态
+    local playerName = player.playerName
+    local isLocal    = player.isLocal
+    local score      = player.score
+    local maxHp      = player.maxHp
+
+    print(string.format("[PlayerManager] 重生玩家%d 销毁旧对象...", playerId))
+
+    -- 销毁旧 GameObject（包括卡死的 Animator、残留的 CharacterController 状态）
+    if player.gameObject ~= nil and not IsNull(player.gameObject) then
+        CS.UnityEngine.GameObject.Destroy(player.gameObject)
     end
+    player.gameObject = nil
+    player.transform  = nil
+    player.controller = nil
+
+    -- 重新加载预制体并实例化
+    local go = ABMgr:LoadRes("player", "HeroDefault", typeof(CS.UnityEngine.GameObject))
+    if go == nil then
+        print("[PlayerManager] 错误：重生时无法加载 HeroDefault")
+        return
+    end
+    go.name = "Player_" .. playerId .. "_" .. playerName
+
+    -- 直接设置世界坐标到出生点（不依赖 PlayerSpawnPoint 父节点）
+    local birthX = Fix64.toFloat(Fix64.new(posX))
+    local birthY = Fix64.toFloat(Fix64.new(posY))
+    local birthZ = Fix64.toFloat(Fix64.new(posZ))
+    go.transform.position = CS.UnityEngine.Vector3(birthX, birthY, birthZ)
+
+    -- 远程玩家：禁用摄像机组件
+    if not isLocal then
+        local camPoint = go.transform:Find("CameraPoint")
+        if camPoint ~= nil then
+            local gameCamera = camPoint:Find("GameCamera")
+            if gameCamera ~= nil then
+                local cam = gameCamera:GetComponent(typeof(CS.UnityEngine.Camera))
+                if cam ~= nil then cam.enabled = false end
+                local listener = gameCamera:GetComponent(typeof(CS.UnityEngine.AudioListener))
+                if listener ~= nil then listener.enabled = false end
+            end
+        end
+    end
+
+    -- 创建全新的 PlayerEntity（所有输入状态归零，避免残留 moveDir 等）
+    local newPlayer = PlayerEntity.new(playerId, playerName, isLocal)
+    newPlayer.gameObject = go
+    newPlayer.transform  = go.transform
+    newPlayer.score      = score
+    newPlayer.maxHp      = maxHp
+    newPlayer.hp         = hp or GC.DEFAULT_HP
+    newPlayer.isAlive    = true
+
+    -- CharacterController
+    local cc = go:GetComponent(typeof(CS.UnityEngine.CharacterController))
+    if IsNull(cc) then
+        cc = go:AddComponent(typeof(CS.UnityEngine.CharacterController))
+    end
+    cc.height     = 1.8
+    cc.radius     = 0.4
+    cc.center     = CS.UnityEngine.Vector3(0, 0.9, 0)
+    cc.stepOffset = 0.3
+    cc.slopeLimit = 45
+    newPlayer.controller = cc
+
+    -- PlayerTag（ArrowTrigger 碰撞检测用）
+    local playerTag = go:GetComponent(typeof(CS.PlayerTag))
+    if IsNull(playerTag) then
+        playerTag = go:AddComponent(typeof(CS.PlayerTag))
+    end
+    playerTag.PlayerId = playerId
+
+    -- 恢复朝向
+    local spawnYaw = self._spawnYaws and self._spawnYaws[playerId]
+    newPlayer:SetYaw(spawnYaw or Fix64.new(0))
+    newPlayer:SetPosition(Fix64.new(posX), Fix64.new(posY), Fix64.new(posZ))
+
+    -- 读取 CC 实际着地状态
+    if not IsNull(cc) then
+        newPlayer.isGrounded = cc.isGrounded
+    end
+
+    -- 替换 players 表中的引用
+    self.players[playerId] = newPlayer
+
+    -- 本地玩家：重置摄像机（刷新 Transform 引用 + 平滑位置）
+    if newPlayer.isLocal then
+        local pc = require("Battle.PlayerController")
+        pc:_SetupCamera()            -- ★ 重新绑定新 GO 的摄像机 Transform
+        pc._smoothCamPos = nil       -- ★ 清除平滑位置，立即跳到重生点
+        newPlayer:NotifyUI()
+    end
+
+    print(string.format("[PlayerManager] 玩家%d 重生完成 pos=(%.2f,%.2f,%.2f) HP=%d",
+        playerId, birthX, birthY, birthZ, newPlayer.hp))
+
+    return
 end
 
 function PlayerManager:OnServerCrystalPickup(playerId, crystalId, newScore)

@@ -41,14 +41,7 @@ function JoinRoomPanel:Hide()
     -- 清理网络回调和轮询
     self:CleanupJoin()
 
-    if self.panelObj ~= nil then
-        self:StopFade()
-        GameObject.Destroy(self.panelObj)
-        self.panelObj = nil
-        self.canvasGroup = nil
-        self.controls = {}
-        self.isInitEvent = false
-    end
+    self:DestroyPanel()
     self.instance = nil
 end
 

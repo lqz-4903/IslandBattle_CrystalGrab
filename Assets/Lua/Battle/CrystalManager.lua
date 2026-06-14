@@ -81,18 +81,6 @@ function CrystalManager:Init()
     end
 end
 
-function CrystalManager:Shutdown()
-    self:Clear()
-    self._activeCrystals = {}
-    self._initialized = false
-    self._usePool = false
-    self._poolWarningDone = false
-    self._crystalPrefab = nil
-    -- ★ 清除触发拾取回调，防止悬挂引用
-    CS.CrystalComponent.OnPlayerEnterTrigger = nil
-    print("[CrystalManager] 已关闭")
-end
-
 -- ========== 水晶生命周期 ==========
 
 --- 内部：设置水晶 GameObject 的通用属性（位置/激活/触发碰撞体/组件ID）

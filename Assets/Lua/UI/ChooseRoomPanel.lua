@@ -21,14 +21,7 @@ end
 
 -- 隐藏并销毁面板
 function ChooseRoomPanel:Hide()
-    if self.panelObj ~= nil then
-        self:StopFade()
-        GameObject.Destroy(self.panelObj)
-        self.panelObj = nil
-        self.canvasGroup = nil
-        self.controls = {}
-        self.isInitEvent = false
-    end
+    self:DestroyPanel()
     self.instance = nil
 end
 

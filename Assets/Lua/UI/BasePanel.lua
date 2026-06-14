@@ -15,8 +15,15 @@ BasePanel.fadeElapsed = 0
 BasePanel.fadeDuration = 0.2
 BasePanel.fadeStartAlpha = 0
 BasePanel.fadeEndAlpha = 1
+-- 遮罩对象（防止UI穿透到下层面板）
+BasePanel.maskObj = nil
+-- 是否使用遮罩（BeginBKPanel和GamePanel不需要，设为false）
+BasePanel.useMask = true
 
 function BasePanel:Init(name)
+    -- ★ 先创建遮罩，再加载面板（保证遮罩在面板下层，阻止点击穿透）
+    self:CreateMask()
+
     if IsNull(self.panelObj) then
         -- ★ 每个面板实例必须有自己独立的 controls 表，防止弹窗面板污染底层面板
         self.controls = {}
@@ -108,6 +115,46 @@ function BasePanel:Init(name)
                 end
             end
         end
+    end
+end
+
+-- 创建遮罩（在面板之前实例化，阻止点击穿透到下层面板）
+function BasePanel:CreateMask()
+    if not self.useMask then
+        return
+    end
+    if not IsNull(self.maskObj) then
+        return  -- 遮罩已存在，避免重复创建
+    end
+    self.maskObj = ABMgr:LoadRes("ui", "imgMask", typeof(GameObject))
+    if IsNull(self.maskObj) then
+        print("[BasePanel] 错误：找不到 imgMask 预制体")
+        return
+    end
+    local canvasGo = GameObject.Find("Canvas")
+    if canvasGo ~= nil then
+        self.maskObj.transform:SetParent(canvasGo.transform, false)
+    end
+end
+
+-- 销毁遮罩
+function BasePanel:DestroyMask()
+    if not IsNull(self.maskObj) then
+        GameObject.Destroy(self.maskObj)
+        self.maskObj = nil
+    end
+end
+
+-- 统一销毁面板和遮罩（替代各面板手动Destroy的重复代码）
+function BasePanel:DestroyPanel()
+    self:DestroyMask()
+    if self.panelObj ~= nil then
+        self:StopFade()
+        GameObject.Destroy(self.panelObj)
+        self.panelObj = nil
+        self.canvasGroup = nil
+        self.controls = {}
+        self.isInitEvent = false
     end
 end
 
@@ -235,26 +282,6 @@ function BasePanel:HideImmediate()
     if self.panelObj then
         self.panelObj:SetActive(false)
     end
-end
-
--- 设置透明度（0-1）
-function BasePanel:SetAlpha(alpha)
-    if self.canvasGroup then
-        self.canvasGroup.alpha = Mathf.Clamp01(alpha)
-    end
-end
-
--- 获取当前透明度
-function BasePanel:GetAlpha()
-    if self.canvasGroup then
-        return self.canvasGroup.alpha
-    end
-    return 0
-end
-
--- 判断是否正在播放动画
-function BasePanel:IsFading()
-    return self.fadeUpdateId ~= nil
 end
 
 -- 停止当前动画

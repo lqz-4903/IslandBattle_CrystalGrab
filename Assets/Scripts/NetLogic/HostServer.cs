@@ -398,10 +398,6 @@ public class HostServer : MonoBehaviour
     {
         if (!_isRunning || !_isGameStarted) return;
         var input = msg as PlayerInput;
-        // ★★★ 诊断：打印反序列化后的原始 PlayerInput 值（前 5 tick + 每 30 tick）★★★
-        if (input != null && (input.Tick <= 5 || input.Tick % 30 == 0))
-            Debug.Log(string.Format("[HS] OnPlayerInput pid={0} tick={1} md={2} yawRaw={3}",
-                input.PlayerId, input.Tick, input.MoveDir, input.CameraYaw));
         _tickSyncHandler.HandlePlayerInput(input);
     }
 
@@ -419,6 +415,13 @@ public class HostServer : MonoBehaviour
         if (!_isRunning || !_isGameStarted) return;
         var pickup = new CrystalPickup { CrystalId = crystalId, PlayerId = playerId };
         _gameEventHandler.HandleCrystalPickup(pickup);
+    }
+
+    /// <summary>主机玩家本地受击（不走网络，直接调服务端处理）</summary>
+    public void SubmitHostPlayerHit(PlayerHit hit)
+    {
+        if (!_isRunning || !_isGameStarted) return;
+        _gameEventHandler.HandlePlayerHit(hit);
     }
 
     /// <summary>Lua 侧在生成玩家时报告出生点（供死亡重生用）</summary>

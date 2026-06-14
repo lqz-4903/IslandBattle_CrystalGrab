@@ -23,11 +23,8 @@ local GC = require("Core.GameConst")
 local InputHandler = require("Battle.InputHandler")
 local PlayerManager = require("Core.PlayerManager")
 local NetworkEventMgr = require("Core.NetworkEventMgr")
-local CrystalManager = require("Battle.CrystalManager")
 local Arrow = require("Battle.Arrow")
 
--- ★ GC优化：预缓存 table.sort 比较函数，避免每次 reconciliation 创建闭包
-local function _sortByTick(a, b) return a.tick < b.tick end
 
 local PlayerController = {}
 PlayerController.__index = PlayerController
@@ -132,6 +129,11 @@ end
 function PlayerController:Update(dt)
     if not self.initialized then return end
 
+    -- ★ 死亡后停止所有输入处理（WASD/跳跃/攻击/翻滚/交互）
+    local pm = PlayerManager.GetInstance()
+    local player = pm:GetPlayer(self.playerId)
+    if player == nil or not player.isAlive then return end
+
     -- 1. 采集本帧输入（60fps）
     InputHandler:Update(dt)
 
@@ -163,7 +165,6 @@ end
 --- 翻滚状态（60fps 更新，供 _SubmitInput 编码到 moveDir bit 4）
 PlayerController._isRolling = false
 PlayerController._rollTimer = 0
-PlayerController._rollYaw = 0
 local ROLL_DURATION = 0.5        -- 翻滚持续秒数
 
 --- 每帧更新本地输入状态（60fps）
@@ -178,7 +179,6 @@ function PlayerController:_UpdateLocalInputState(_dt)
     if InputHandler.rollPressed and player.isGrounded and not self._isRolling then
         self._isRolling = true
         self._rollTimer = 0
-        self._rollYaw = InputHandler.cameraYaw
     end
     if self._isRolling then
         self._rollTimer = self._rollTimer + _dt
@@ -244,6 +244,11 @@ function PlayerController:_SetupCamera()
     print("[PlayerController] 降级创建默认摄像机")
 end
 
+--- ★ 重生后刷新摄像机引用（旧 GO 已销毁，需指向新 GO 的摄像机）
+function PlayerController:RefreshCamera()
+    self:_SetupCamera()
+end
+
 --- 设置摄像机参数（与 UICamera 配合：UICamera depth=0 渲染 UI 层在上）
 function PlayerController:_ApplyCameraSettings(cam)
     -- 场景渲染（不渲染 UI 层，UI 层由 UICamera 单独渲染）
@@ -265,6 +270,9 @@ function PlayerController:_UpdateCamera()
     local pm = PlayerManager.GetInstance()
     local player = pm:GetPlayer(self.playerId)
     if player == nil or player.transform == nil or IsNull(player.transform) then return end
+
+    -- ★ 死亡后冻结摄像机（不跟随鼠标，不旋转身体）
+    if not player.isAlive then return end
 
     local yaw   = InputHandler.cameraYaw
     local pitch = InputHandler.cameraPitch
@@ -305,6 +313,11 @@ end
 
 --- 按逻辑帧率提交输入到服务端
 function PlayerController:_SubmitInput()
+    -- ★ 死亡后不提交任何输入
+    local pm = PlayerManager.GetInstance()
+    local player = pm:GetPlayer(self.playerId)
+    if player == nil or not player.isAlive then return end
+
     local input = InputHandler:GetTickInput()
 
     if self.isHost then
@@ -332,14 +345,6 @@ function PlayerController:_SubmitHostInput(input)
     if self._isRolling then
         moveDir = moveDir | GC.MOVE_ROLL
     end
-
-    -- ★★★ 诊断：主机本地提交的值（前 5 tick + 每 30 tick）★★★
-    local st = self._nextSendHostSeq or 0
-    if st <= 5 or st % 30 == 0 then
-        print(string.format("[PC] SubmitHost pid=%d sendSeq=%d md=%d yawRaw=%d yawDeg=%.1f",
-            self.playerId, st, moveDir, yawRaw, input.cameraYaw * 57.29578))
-    end
-    self._nextSendHostSeq = st + 1
 
     -- ★ 构造 PlayerInput proto（与 _SubmitClientInput 完全相同的结构）
     local playerInput = CS.GameProto.PlayerInput()
@@ -379,12 +384,6 @@ function PlayerController:_SubmitClientInput(input)
         moveDir = moveDir | GC.MOVE_ROLL
     end
     playerInput.MoveDir = moveDir
-
-    -- ★★★ 诊断：客户端发送的原始值（前 5 tick + 每 30 tick）★★★
-    if clientTick <= 5 or clientTick % 30 == 0 then
-        print(string.format("[PC] SubmitClient pid=%d clientTick=%d md=%d yawRaw=%d yawDeg=%.1f",
-            self.playerId, clientTick, moveDir, yawRaw, input.cameraYaw * 57.29578))
-    end
 
     -- ★ 客户端预测-校正：缓存输入供回滚重放（含翻滚标记）
     --    GC优化：复用 _bufPool 中的 table，避免每个 tick new {}
@@ -438,45 +437,8 @@ function PlayerController:_ProcessAttack(dt)
     end
 end
 
--- ========== 交互处理 ==========
-
---- 处理水晶拾取（距离检测，不依赖按键，自动拾取最近的水晶）
---- ★ 全程可拾取（生成阶段 + 攻击阶段均可）
-function PlayerController:_ProcessInteract()
-    local pm = PlayerManager.GetInstance()
-    local player = pm:GetPlayer(self.playerId)
-    if player == nil or player.transform == nil then return end
-
-    local cm = CrystalManager.GetInstance()
-    local pickupRange = cm:GetPickupRange() or 0.8
-
-    local myPos = player.transform.position
-
-    -- 遍历所有水晶，找最近的在范围内的
-    local nearestId, nearestDist = nil, math.huge
-    for crystalId, go in cm:ForEach() do
-        if go ~= nil and not IsNull(go) then
-            -- Tag 检查（CompareTag 在已销毁对象上会抛异常，先判空）
-            local ok, hasTag = pcall(function() return go.CompareTag("Crystal") end)
-            if ok and hasTag then
-                local crystalPos = go.transform.position
-                local dx, dy, dz = myPos.x - crystalPos.x,
-                                   myPos.y - crystalPos.y,
-                                   myPos.z - crystalPos.z
-                local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
-                if dist < pickupRange and dist < nearestDist then
-                    nearestDist = dist
-                    nearestId = crystalId
-                end
-            end
-        end
-    end
-
-    -- 如果在范围内，发送拾取请求
-    if nearestId ~= nil then
-        self:_SendCrystalPickup(nearestId)
-    end
-end
+-- ★ 水晶拾取已迁移到 Trigger 系统（CrystalComponent.OnTriggerEnter → CrystalManager:_HandleTriggerEnter）
+--    _SendCrystalPickup 仍被 CrystalManager 调用，保留。
 
 --- 发送水晶拾取请求到服务端
 function PlayerController:_SendCrystalPickup(crystalId)
@@ -530,29 +492,5 @@ function PlayerController:AcknowledgeUpTo(tick)
     end
 end
 
---- 获取未确认输入的数量（不创建任何 table，零 GC）
---- @return int
-function PlayerController:GetUnackedCount()
-    local count = 0
-    for tick, _ in pairs(self._inputBuffer) do
-        if tick > self._lastAckedTick then
-            count = count + 1
-        end
-    end
-    return count
-end
-
---- 获取所有未被服务端确认的输入（按 tick 升序排列）
---- @return table[] — {{tick=int, data={moveDir,yaw,jump}}, ...}
-function PlayerController:GetUnackedInputs()
-    local result = {}
-    for tick, data in pairs(self._inputBuffer) do
-        if tick > self._lastAckedTick then
-            result[#result + 1] = { tick = tick, data = data }
-        end
-    end
-    table.sort(result, _sortByTick)
-    return result
-end
 
 return PlayerController

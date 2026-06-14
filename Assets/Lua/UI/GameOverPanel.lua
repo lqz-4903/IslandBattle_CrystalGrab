@@ -3,25 +3,6 @@ BasePanel:subClass("GameOverPanel")
 
 GameOverPanel.panelName = "GameOverPanel"
 GameOverPanel.instance = nil
-GameOverPanel.maskObj = nil   -- 遮罩对象（防止UI穿透）
-
--- 创建遮罩（在GameOverPanel之前实例化，阻止点击穿透到下层面板）
-function GameOverPanel:CreateMask()
-    if not IsNull(self.maskObj) then
-        return  -- 遮罩已存在，避免重复创建
-    end
-    -- 注意：ABMgr:LoadRes 对 GameObject 类型已自动 Instantiate，直接使用返回值即可
-    self.maskObj = ABMgr:LoadRes("ui", "imgMask", typeof(GameObject))
-    if IsNull(self.maskObj) then
-        print("[GameOverPanel] 错误：找不到 imgMask 预制体")
-        return
-    end
-    local canvasGo = GameObject.Find("Canvas")
-    if canvasGo ~= nil then
-        self.maskObj.transform:SetParent(canvasGo.transform, false)
-    end
-    print("[GameOverPanel] imgMask 遮罩已创建")
-end
 
 -- 弹出显示
 function GameOverPanel:Popup()
@@ -41,21 +22,7 @@ end
 
 -- 关闭弹窗
 function GameOverPanel:Close()
-    -- 先销毁遮罩
-    if not IsNull(self.maskObj) then
-        GameObject.Destroy(self.maskObj)
-        self.maskObj = nil
-        print("[GameOverPanel] imgMask 遮罩已销毁")
-    end
-    -- 再销毁面板
-    if self.panelObj ~= nil then
-        self:StopFade()
-        GameObject.Destroy(self.panelObj)
-        self.panelObj = nil
-        self.canvasGroup = nil
-        self.controls = {}
-        self.isInitEvent = false
-    end
+    self:DestroyPanel()
     self.instance = nil
 end
 

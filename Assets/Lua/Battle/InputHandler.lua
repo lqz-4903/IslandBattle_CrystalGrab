@@ -34,7 +34,6 @@ InputHandler.attackHeld    = false
 InputHandler.firePressed   = false  -- ★ 左键按下粘滞（单发箭矢）
 InputHandler.skillPressed  = false
 InputHandler.rollPressed   = false
-InputHandler.reloadPressed = false
 InputHandler.chargeTime    = 0   -- 蓄力累计（秒）
 InputHandler._attackWasHeldThisTickWindow = false  -- ★ 30fps tick 窗口内 attackHeld 是否曾为 true
 
@@ -59,7 +58,6 @@ function InputHandler:Init()
     self.firePressed   = false
     self.skillPressed  = false
     self.rollPressed   = false
-    self.reloadPressed = false
     self.chargeTime    = 0
     self._mouseDeltaX = 0
     self._mouseDeltaY = 0
@@ -126,10 +124,6 @@ function InputHandler:Update(dt)
     if CS.UnityEngine.Input.GetKeyDown(GC.KEYCODE.ROLL) then
         self.rollPressed = true
     end
-    if CS.UnityEngine.Input.GetKeyDown(GC.KEYCODE.RELOAD) then
-        self.reloadPressed = true
-    end
-
     -- 蓄力计时
     if self.attackHeld then
         if not self._isCharging then
@@ -183,7 +177,6 @@ function InputHandler:GetTickInput()
     self.jumpPressed   = false
     self.skillPressed  = false
     self.rollPressed   = false
-    self.reloadPressed = false
     self.firePressed   = false                     -- ★ 消费
     self._attackWasHeldThisTickWindow = false      -- ★ 消费
 

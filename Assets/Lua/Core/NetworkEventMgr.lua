@@ -106,12 +106,6 @@ function NetworkEventMgr:_OnGameStart(msg)
           " 帧率=" .. (msg.TickRate or 30))
 end
 
---- ★ 阶段切换（已弃用——全程无阶段限制，服务端不再广播 PhaseSwitch）
---- 该方法不再被调用，保留仅为代码兼容性
-function NetworkEventMgr:_OnPhaseSwitch()
-    -- no-op
-end
-
 --- ★ 死亡掉落
 --- @param msg CrystalDrop（protobuf）：Count, PlayerId, NewScore
 function NetworkEventMgr:_OnCrystalDrop(msg)
@@ -161,12 +155,13 @@ end
 
 --- 玩家受击
 function NetworkEventMgr:_OnPlayerHit(msg)
-    local attackerId = msg.AttackerId
-    local victimId   = msg.VictimId
-    local droppedCount = msg.DroppedCount
+    local attackerId   = msg.AttackerId
+    local victimId     = msg.VictimId
+    local damage       = msg.Damage or 0
+    local newHp        = msg.NewHp or 0
 
     local pm = PlayerManager.GetInstance()
-    pm:OnServerPlayerHit(attackerId, victimId, droppedCount)
+    pm:OnServerPlayerHit(attackerId, victimId, damage, newHp)
 end
 
 --- 玩家坠落

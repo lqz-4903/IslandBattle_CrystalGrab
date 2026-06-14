@@ -75,24 +75,24 @@ namespace GameProto {
             "YXduEhIKCmNyeXN0YWxfaWQYASABKAUSDQoFcG9zX3gYAiABKBASDQoFcG9z",
             "X3kYAyABKBASDQoFcG9zX3oYBCABKBAiSQoNQ3J5c3RhbFBpY2t1cBISCgpj",
             "cnlzdGFsX2lkGAEgASgFEhEKCXBsYXllcl9pZBgCIAEoBRIRCgluZXdfc2Nv",
-            "cmUYAyABKAUiSgoJUGxheWVySGl0EhMKC2F0dGFja2VyX2lkGAEgASgFEhEK",
-            "CXZpY3RpbV9pZBgCIAEoBRIVCg1kcm9wcGVkX2NvdW50GAMgASgFIjYKClBs",
-            "YXllckZhbGwSEQoJcGxheWVyX2lkGAEgASgFEhUKDWRyb3BwZWRfY291bnQY",
-            "AiABKAUiTwoNUGxheWVyUmVzcGF3bhIRCglwbGF5ZXJfaWQYASABKAUSDQoF",
-            "cG9zX3gYAiABKBASDQoFcG9zX3kYAyABKBASDQoFcG9zX3oYBCABKBAiQQoH",
-            "R2FtZUVuZBIOCgZzY29yZXMYASADKAUSEQoJd2lubmVyX2lkGAIgASgFEhMK",
-            "C3dpbm5lcl9uYW1lGAMgASgJIikKD0dhbWVUaW1lclVwZGF0ZRIWCg5yZW1h",
-            "aW5pbmdfdGltZRgBIAEoAiI3Cg1QbGF5ZXJPZmZsaW5lEhEKCXBsYXllcl9p",
-            "ZBgBIAEoBRITCgtwbGF5ZXJfbmFtZRgCIAEoCSJDCgtQaGFzZVN3aXRjaBIS",
-            "CgpwaGFzZV90eXBlGAEgASgFEg0KBXJvdW5kGAIgASgFEhEKCXJlbWFpbmlu",
-            "ZxgDIAEoAiJCCgtDcnlzdGFsRHJvcBINCgVjb3VudBgBIAEoBRIRCglwbGF5",
-            "ZXJfaWQYAiABKAUSEQoJbmV3X3Njb3JlGAMgASgFIjEKCVJlY29ubmVjdBIR",
-            "CglwbGF5ZXJfaWQYASABKAUSEQoJbGFzdF90aWNrGAIgASgFIlMKDFJlY29u",
-            "bmVjdEFjaxIPCgdzdWNjZXNzGAEgASgIEhUKDWNhdGNoX3VwX2Zyb20YAiAB",
-            "KAUSGwoTY3VycmVudF9zZXJ2ZXJfdGljaxgDIAEoBSJSCgxDYXRjaFVwVGlj",
-            "a3MSEQoJZnJvbV90aWNrGAEgASgFEg8KB3RvX3RpY2sYAiABKAUSHgoFdGlj",
-            "a3MYAyADKAsyDy5HYW1lLklucHV0VGlja0IMqgIJR2FtZVByb3RvYgZwcm90",
-            "bzM="));
+            "cmUYAyABKAUiagoJUGxheWVySGl0EhMKC2F0dGFja2VyX2lkGAEgASgFEhEK",
+            "CXZpY3RpbV9pZBgCIAEoBRIVCg1kcm9wcGVkX2NvdW50GAMgASgFEg4KBmRh",
+            "bWFnZRgEIAEoBRIOCgZuZXdfaHAYBSABKAUiNgoKUGxheWVyRmFsbBIRCglw",
+            "bGF5ZXJfaWQYASABKAUSFQoNZHJvcHBlZF9jb3VudBgCIAEoBSJPCg1QbGF5",
+            "ZXJSZXNwYXduEhEKCXBsYXllcl9pZBgBIAEoBRINCgVwb3NfeBgCIAEoEBIN",
+            "CgVwb3NfeRgDIAEoEBINCgVwb3NfehgEIAEoECJBCgdHYW1lRW5kEg4KBnNj",
+            "b3JlcxgBIAMoBRIRCgl3aW5uZXJfaWQYAiABKAUSEwoLd2lubmVyX25hbWUY",
+            "AyABKAkiKQoPR2FtZVRpbWVyVXBkYXRlEhYKDnJlbWFpbmluZ190aW1lGAEg",
+            "ASgCIjcKDVBsYXllck9mZmxpbmUSEQoJcGxheWVyX2lkGAEgASgFEhMKC3Bs",
+            "YXllcl9uYW1lGAIgASgJIkMKC1BoYXNlU3dpdGNoEhIKCnBoYXNlX3R5cGUY",
+            "ASABKAUSDQoFcm91bmQYAiABKAUSEQoJcmVtYWluaW5nGAMgASgCIkIKC0Ny",
+            "eXN0YWxEcm9wEg0KBWNvdW50GAEgASgFEhEKCXBsYXllcl9pZBgCIAEoBRIR",
+            "CgluZXdfc2NvcmUYAyABKAUiMQoJUmVjb25uZWN0EhEKCXBsYXllcl9pZBgB",
+            "IAEoBRIRCglsYXN0X3RpY2sYAiABKAUiUwoMUmVjb25uZWN0QWNrEg8KB3N1",
+            "Y2Nlc3MYASABKAgSFQoNY2F0Y2hfdXBfZnJvbRgCIAEoBRIbChNjdXJyZW50",
+            "X3NlcnZlcl90aWNrGAMgASgFIlIKDENhdGNoVXBUaWNrcxIRCglmcm9tX3Rp",
+            "Y2sYASABKAUSDwoHdG9fdGljaxgCIAEoBRIeCgV0aWNrcxgDIAMoCzIPLkdh",
+            "bWUuSW5wdXRUaWNrQgyqAglHYW1lUHJvdG9iBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
@@ -113,7 +113,7 @@ namespace GameProto {
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.InputTick), global::GameProto.InputTick.Parser, new[]{ "Tick", "Inputs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.CrystalSpawn), global::GameProto.CrystalSpawn.Parser, new[]{ "CrystalId", "PosX", "PosY", "PosZ" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.CrystalPickup), global::GameProto.CrystalPickup.Parser, new[]{ "CrystalId", "PlayerId", "NewScore" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerHit), global::GameProto.PlayerHit.Parser, new[]{ "AttackerId", "VictimId", "DroppedCount" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerHit), global::GameProto.PlayerHit.Parser, new[]{ "AttackerId", "VictimId", "DroppedCount", "Damage", "NewHp" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerFall), global::GameProto.PlayerFall.Parser, new[]{ "PlayerId", "DroppedCount" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.PlayerRespawn), global::GameProto.PlayerRespawn.Parser, new[]{ "PlayerId", "PosX", "PosY", "PosZ" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GameProto.GameEnd), global::GameProto.GameEnd.Parser, new[]{ "Scores", "WinnerId", "WinnerName" }, null, null, null, null),
@@ -6093,6 +6093,8 @@ namespace GameProto {
       attackerId_ = other.attackerId_;
       victimId_ = other.victimId_;
       droppedCount_ = other.droppedCount_;
+      damage_ = other.damage_;
+      newHp_ = other.newHp_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -6130,7 +6132,7 @@ namespace GameProto {
     public const int DroppedCountFieldNumber = 3;
     private int droppedCount_;
     /// <summary>
-    /// 掉了几颗晶石
+    /// 掉了几颗晶石（保留兼容，死亡时由服务端填）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6138,6 +6140,36 @@ namespace GameProto {
       get { return droppedCount_; }
       set {
         droppedCount_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "damage" field.</summary>
+    public const int DamageFieldNumber = 4;
+    private int damage_;
+    /// <summary>
+    /// ★ 本次伤害值
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int Damage {
+      get { return damage_; }
+      set {
+        damage_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "new_hp" field.</summary>
+    public const int NewHpFieldNumber = 5;
+    private int newHp_;
+    /// <summary>
+    /// ★ 受击后受害者的 HP
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int NewHp {
+      get { return newHp_; }
+      set {
+        newHp_ = value;
       }
     }
 
@@ -6159,6 +6191,8 @@ namespace GameProto {
       if (AttackerId != other.AttackerId) return false;
       if (VictimId != other.VictimId) return false;
       if (DroppedCount != other.DroppedCount) return false;
+      if (Damage != other.Damage) return false;
+      if (NewHp != other.NewHp) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -6169,6 +6203,8 @@ namespace GameProto {
       if (AttackerId != 0) hash ^= AttackerId.GetHashCode();
       if (VictimId != 0) hash ^= VictimId.GetHashCode();
       if (DroppedCount != 0) hash ^= DroppedCount.GetHashCode();
+      if (Damage != 0) hash ^= Damage.GetHashCode();
+      if (NewHp != 0) hash ^= NewHp.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -6199,6 +6235,14 @@ namespace GameProto {
         output.WriteRawTag(24);
         output.WriteInt32(DroppedCount);
       }
+      if (Damage != 0) {
+        output.WriteRawTag(32);
+        output.WriteInt32(Damage);
+      }
+      if (NewHp != 0) {
+        output.WriteRawTag(40);
+        output.WriteInt32(NewHp);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -6221,6 +6265,14 @@ namespace GameProto {
         output.WriteRawTag(24);
         output.WriteInt32(DroppedCount);
       }
+      if (Damage != 0) {
+        output.WriteRawTag(32);
+        output.WriteInt32(Damage);
+      }
+      if (NewHp != 0) {
+        output.WriteRawTag(40);
+        output.WriteInt32(NewHp);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -6239,6 +6291,12 @@ namespace GameProto {
       }
       if (DroppedCount != 0) {
         size += 1 + pb::CodedOutputStream.ComputeInt32Size(DroppedCount);
+      }
+      if (Damage != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeInt32Size(Damage);
+      }
+      if (NewHp != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeInt32Size(NewHp);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -6260,6 +6318,12 @@ namespace GameProto {
       }
       if (other.DroppedCount != 0) {
         DroppedCount = other.DroppedCount;
+      }
+      if (other.Damage != 0) {
+        Damage = other.Damage;
+      }
+      if (other.NewHp != 0) {
+        NewHp = other.NewHp;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -6292,6 +6356,14 @@ namespace GameProto {
             DroppedCount = input.ReadInt32();
             break;
           }
+          case 32: {
+            Damage = input.ReadInt32();
+            break;
+          }
+          case 40: {
+            NewHp = input.ReadInt32();
+            break;
+          }
         }
       }
     #endif
@@ -6321,6 +6393,14 @@ namespace GameProto {
           }
           case 24: {
             DroppedCount = input.ReadInt32();
+            break;
+          }
+          case 32: {
+            Damage = input.ReadInt32();
+            break;
+          }
+          case 40: {
+            NewHp = input.ReadInt32();
             break;
           }
         }
