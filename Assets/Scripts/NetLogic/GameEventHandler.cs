@@ -30,9 +30,9 @@ public class GameEventHandler
     // ★ 水晶分值
     private const int CrystalScoreValue = 6;
     // ★ 各区生成间隔（秒）
-    private static readonly Fix64 ZoneSpawnInterval = Fix64.FromFloat(2.0f);
-    // ★ 五个区域总共生成上限（只算区域生成，不算死亡掉落）
-    private const int MaxZoneSpawned = 45;
+    private static readonly Fix64 ZoneSpawnInterval = Fix64.FromFloat(1.5f);
+    // ★ 场上同时存在上限（只算区域生成，不算死亡掉落）。拾取后释放配额，新水晶继续生成。
+    private const int MaxCrystalsOnField = 35;
     // ★ 游戏总时长（秒）
     private static readonly Fix64 GameDuration = Fix64.FromFloat(127f);
     // ★ 初始 HP
@@ -68,7 +68,7 @@ public class GameEventHandler
 
     // --- 水晶 ---
     private int _nextCrystalId = 1;
-    private int _zoneSpawnedCount;  // ★ 五个区域已生成总数（只算区域，不算死亡掉落）
+    private int _zoneSpawnedCount;  // ★ 五个区域已生成总数（只算区域，不算死亡掉落，仅用于统计）
     private Dictionary<int, CrystalData> _activeCrystals = new();
 
     // --- 玩家 ---
@@ -197,18 +197,18 @@ public class GameEventHandler
             BroadcastTimerUpdate();
         }
 
-        // === 水晶生成（全程可生成，区域已初始化，且未达上限）===
-        if (_spawnZones != null && _zoneSpawnedCount < MaxZoneSpawned)
+        // === 水晶生成（全程可生成，区域已初始化，且未达场上同时存在上限）===
+        if (_spawnZones != null && _activeCrystals.Count < MaxCrystalsOnField)
         {
             for (int z = 0; z < _spawnZones.Length; z++)
             {
-                if (_zoneSpawnedCount >= MaxZoneSpawned) break;
+                if (_activeCrystals.Count >= MaxCrystalsOnField) break;
                 _zoneTimers[z] += deltaTime;
                 while (_zoneTimers[z] >= ZoneSpawnInterval)
                 {
                     _zoneTimers[z] -= ZoneSpawnInterval;
                     SpawnCrystalInZone(z);
-                    if (_zoneSpawnedCount >= MaxZoneSpawned) break;
+                    if (_activeCrystals.Count >= MaxCrystalsOnField) break;
                 }
             }
         }
@@ -284,7 +284,7 @@ public class GameEventHandler
         if (zoneIndex < 0 || zoneIndex >= _spawnZones.Length) return;
 
         int crystalId = _nextCrystalId++;
-        _zoneSpawnedCount++;  // ★ 累计区域生成数（只算区域，不算死亡掉落）
+        _zoneSpawnedCount++;  // ★ 累计区域生成数（仅统计，不作为限制条件）
         var zone = _spawnZones[zoneIndex];
 
         // 确定性随机：在圆形区域内随机位置
