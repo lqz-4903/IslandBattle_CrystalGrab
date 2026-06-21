@@ -2,6 +2,7 @@
 BasePanel:subClass("TipPanel")
 
 TipPanel.panelName = "TipPanel"
+TipPanel.canvasLayer = "Dynamic"
 TipPanel.instance = nil
 
 -- 弹出显示

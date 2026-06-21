@@ -3,6 +3,7 @@ BasePanel:subClass("ChooseRoomPanel")
 
 -- 面板名称（对应AB包中的预制体名称）
 ChooseRoomPanel.panelName = "ChooseRoomPanel"
+ChooseRoomPanel.canvasLayer = "Static"
 
 -- 单例引用
 ChooseRoomPanel.instance = nil

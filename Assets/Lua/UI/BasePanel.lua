@@ -19,6 +19,20 @@ BasePanel.fadeEndAlpha = 1
 BasePanel.maskObj = nil
 -- 是否使用遮罩（BeginBKPanel和GamePanel不需要，设为false）
 BasePanel.useMask = true
+-- 画布层级："Static" | "Mid" | "Dynamic"，子类按需覆盖，未设置默认 Mid
+BasePanel.canvasLayer = "Mid"
+
+-- 根据 canvasLayer 返回对应 Canvas 的 Transform（替代 GameObject.Find 硬编码）
+function BasePanel:GetCanvasTransform()
+    local layer = self.canvasLayer or "Mid"
+    if layer == "Static" then
+        return CS.SceneMgr.Instance.Canvas_Static.transform
+    elseif layer == "Dynamic" then
+        return CS.SceneMgr.Instance.Canvas_Dynamic.transform
+    else
+        return CS.SceneMgr.Instance.Canvas_Mid.transform
+    end
+end
 
 function BasePanel:Init(name)
     -- ★ 先创建遮罩，再加载面板（保证遮罩在面板下层，阻止点击穿透）
@@ -34,9 +48,9 @@ function BasePanel:Init(name)
             print("错误：AB包中找不到预制体 " .. name)
             return
         end
-        local canvasGo = GameObject.Find("Canvas")
-        if canvasGo ~= nil then
-            self.panelObj.transform:SetParent(canvasGo.transform, false)
+        local canvasTransform = self:GetCanvasTransform()
+        if canvasTransform ~= nil then
+            self.panelObj.transform:SetParent(canvasTransform, false)
         end
 
         -- 添加CanvasGroup组件（如果还没有）
@@ -46,23 +60,21 @@ function BasePanel:Init(name)
         end
 
         -- GetComponentsInChildren
-        -- 找所有UI控件 存起来
+        -- 找所有UI控件 存起来（单次遍历：RaycastTarget 优化 + 控件收集合并）
         local allControls = self.panelObj:GetComponentsInChildren(typeof(UIBehaviour))
-        -- 优化：关闭不需要交互的控件的RaycastTarget
         for i = 0, allControls.Length - 1 do
             local ctrl = allControls[i]
             local typeName = ctrl:GetType().Name
             local ctrlName = ctrl.name
+
+            -- Part A: 关闭不需要交互的控件的 RaycastTarget
             if typeName == "Text" then
-                -- Text一律关掉
                 ctrl.raycastTarget = false
             elseif typeName == "Image" then
-                -- 保留可交互控件自身的Image（btn/tog/sld/input前缀）
                 local keepRaycast = string.find(ctrlName, "btn") ~= nil or
                                     string.find(ctrlName, "tog") ~= nil or
                                     string.find(ctrlName, "sld") ~= nil or
                                     string.find(ctrlName, "input") ~= nil
-                -- 也保留Toggle/Slider等交互控件的子Image（如Background、Checkmark、Handle）
                 if not keepRaycast then
                     local parent = ctrl.transform.parent
                     if parent ~= nil then
@@ -77,41 +89,20 @@ function BasePanel:Init(name)
                     ctrl.raycastTarget = false
                 end
             end
-        end
-        -- 如果存入一些对于我们来说没用UI控件
-        -- 为了避免 找各种无用控件 定一个规则 拼面板时 控件命名一定按规范来
-        -- Button btnName
-        -- Toggle togName
-        -- Image imgName
-        -- ScrollRect svName
-        -- Slider sldName
-        -- InputField inputName
-        for i = 0, allControls.Length - 1 do
-            local controlName = allControls[i].name
-            if string.find(controlName, "btn") ~= nil or
-               string.find(controlName, "tog") ~= nil or
-               string.find(controlName, "img") ~= nil or
-               string.find(controlName, "sv") ~= nil or
-               string.find(controlName, "txt") ~= nil or
-               string.find(controlName, "sld") ~= nil or
-               string.find(controlName, "input") ~= nil
-            then
-                -- 为了让我们在得的时候 能够 确定得的控件类型 所以我们需要存储类型
-                -- 利用反射 Type 得到 控件的类名
-                local typeName = allControls[i]:GetType().Name
 
-                -- 避免出现一个对象上 挂载多个UI控件 出现覆盖的问题
-                -- 都会被存到一个容器中 相当于像列表数组的形式
-                -- 最终存储形式
-                -- {
-                --    btnRole = { Image = 控件, Button = 控件},
-                --    togItem = { Toggle = 控件 }
-                -- }
-                if self.controls[controlName] ~= nil then
-                    -- 通过自定义索引的形式 去加一个新的 "成员变量"
-                    self.controls[controlName][typeName] = allControls[i]
+            -- Part B: 按命名规范收集控件（btn/tog/img/sv/txt/sld/input 前缀）
+            if string.find(ctrlName, "btn") ~= nil or
+               string.find(ctrlName, "tog") ~= nil or
+               string.find(ctrlName, "img") ~= nil or
+               string.find(ctrlName, "sv") ~= nil or
+               string.find(ctrlName, "txt") ~= nil or
+               string.find(ctrlName, "sld") ~= nil or
+               string.find(ctrlName, "input") ~= nil
+            then
+                if self.controls[ctrlName] ~= nil then
+                    self.controls[ctrlName][typeName] = ctrl
                 else
-                    self.controls[controlName] = {[typeName] = allControls[i]}
+                    self.controls[ctrlName] = {[typeName] = ctrl}
                 end
             end
         end
@@ -131,9 +122,9 @@ function BasePanel:CreateMask()
         print("[BasePanel] 错误：找不到 imgMask 预制体")
         return
     end
-    local canvasGo = GameObject.Find("Canvas")
-    if canvasGo ~= nil then
-        self.maskObj.transform:SetParent(canvasGo.transform, false)
+    local canvasTransform = self:GetCanvasTransform()
+    if canvasTransform ~= nil then
+        self.maskObj.transform:SetParent(canvasTransform, false)
     end
 end
 

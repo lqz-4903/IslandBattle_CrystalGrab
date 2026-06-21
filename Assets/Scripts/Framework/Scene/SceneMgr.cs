@@ -25,15 +25,17 @@ public class SceneMgr : MonoBehaviour
         }
     }
 
-    private Canvas _canvas;
+    private Canvas _canvasStatic;
+    private Canvas _canvasMid;
+    private Canvas _canvasDynamic;
     private EventSystem _eventSystem;
     private Camera _uiCamera;
     private bool _initialized = false;
 
     /// <summary>
-    /// 从代码创建持久UI对象（Canvas / EventSystem / UICamera）
+    /// 从代码创建持久UI对象（3 层 Canvas / EventSystem / UICamera）
+    /// 动静分离：Static(0) 永不重建的背景|Mid(1) 偶发变更的大厅|Dynamic(2) 高频 HUD
     /// 幂等：首次调用创建并标记 DontDestroyOnLoad，后续调用直接返回
-    /// 这样场景中就不需要放置这些对象，彻底杜绝切场景时产生重复
     /// </summary>
     public void Init()
     {
@@ -42,31 +44,15 @@ public class SceneMgr : MonoBehaviour
 
         _initialized = true;
 
-        // —— 创建 Canvas ——
-        GameObject canvasGo = new GameObject("Canvas");
-        _canvas = canvasGo.AddComponent<Canvas>();
-        _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        _canvas.pixelPerfect = false;
-        _canvas.sortingOrder = 0;
+        // —— 创建 3 层 Canvas（动静分离）——
+        _canvasStatic  = CreateCanvas("Canvas_Static",  0);
+        _canvasMid     = CreateCanvas("Canvas_Mid",     1);
+        _canvasDynamic = CreateCanvas("Canvas_Dynamic", 2);
 
-        // CanvasScaler: 随屏幕缩放，参考分辨率 1920x1080
-        CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 1f;
-
-        // GraphicRaycaster: 接收 UI 事件
-        GraphicRaycaster raycaster = canvasGo.AddComponent<GraphicRaycaster>();
-        raycaster.blockingObjects = GraphicRaycaster.BlockingObjects.None;
-
-        DontDestroyOnLoad(canvasGo);
-
-        // —— 创建 EventSystem ——
+        // —— 创建 EventSystem（3 层 Canvas 共享 1 个，Unity 按 sortingOrder 降序遍历 GraphicRaycaster）——
         GameObject esGo = new GameObject("EventSystem");
         _eventSystem = esGo.AddComponent<EventSystem>();
-        // StandaloneInputModule: 处理键盘/鼠标输入
         esGo.AddComponent<StandaloneInputModule>();
-
         DontDestroyOnLoad(esGo);
 
         // —— 创建 UICamera ——
@@ -80,17 +66,33 @@ public class SceneMgr : MonoBehaviour
         _uiCamera.farClipPlane = 1000f;
         _uiCamera.depth = 0f;
         _uiCamera.backgroundColor = new Color(0.192f, 0.302f, 0.475f, 0f);
-
         DontDestroyOnLoad(camGo);
     }
 
     /// <summary>
-    /// 旧的 Init 重载（不再需要传参，内部转发到无参版）
+    /// 创建一个 ScreenSpaceOverlay Canvas（含 CanvasScaler + GraphicRaycaster）
     /// </summary>
-    public void Init(Canvas canvas, EventSystem eventSystem, Camera uiCamera)
+    private Canvas CreateCanvas(string name, int sortingOrder)
     {
-        Init();
+        GameObject go = new GameObject(name);
+        Canvas canvas = go.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.pixelPerfect = false;
+        canvas.sortingOrder = sortingOrder;
+
+        CanvasScaler scaler = go.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.matchWidthOrHeight = 1f;
+
+        GraphicRaycaster raycaster = go.AddComponent<GraphicRaycaster>();
+        raycaster.blockingObjects = GraphicRaycaster.BlockingObjects.None;
+
+        DontDestroyOnLoad(go);
+        return canvas;
     }
+
+    // 旧重载已移除 —— 改用无参 Init() + Canvas_Static / Canvas_Mid / Canvas_Dynamic 属性
 
     /// <summary>
     /// 切换场景
@@ -118,7 +120,17 @@ public class SceneMgr : MonoBehaviour
     }
 
     /// <summary>
-    /// 获取持久 Canvas
+    /// 静态层 Canvas（sortingOrder=0）—— 永不修改的背景/信息页
     /// </summary>
-    public Canvas Canvas => _canvas;
+    public Canvas Canvas_Static => _canvasStatic;
+
+    /// <summary>
+    /// 中间层 Canvas（sortingOrder=1）—— 偶发变更的大厅/弹窗
+    /// </summary>
+    public Canvas Canvas_Mid => _canvasMid;
+
+    /// <summary>
+    /// 动态层 Canvas（sortingOrder=2）—— 高频 per-frame 更新的 HUD
+    /// </summary>
+    public Canvas Canvas_Dynamic => _canvasDynamic;
 }

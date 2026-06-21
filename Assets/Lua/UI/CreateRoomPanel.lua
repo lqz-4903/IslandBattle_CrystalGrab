@@ -3,6 +3,7 @@ BasePanel:subClass("CreateRoomPanel")
 
 -- 面板名称（对应AB包中的预制体名称）
 CreateRoomPanel.panelName = "CreateRoomPanel"
+CreateRoomPanel.canvasLayer = "Mid"
 
 -- 单例引用
 CreateRoomPanel.instance = nil

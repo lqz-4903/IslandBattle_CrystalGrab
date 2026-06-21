@@ -3,6 +3,7 @@ BasePanel:subClass("AboutPanel")
 
 -- 面板名称（对应AB包中的预制体名称）
 AboutPanel.panelName = "AboutPanel"
+AboutPanel.canvasLayer = "Static"
 
 -- 单例引用
 AboutPanel.instance = nil

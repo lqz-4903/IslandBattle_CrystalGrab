@@ -136,6 +136,11 @@ function OnSceneLoaded()
         _G.pendingGameStart = nil
         _G.lastPlayerList = nil
 
+        -- 清理 GameScene 可能残留的面板（如游戏结束时恰好打开的 SettingPanel）
+        SettingPanel:Hide()
+        GameOverPanel:Close()
+        GamePanel:Hide()
+
         -- BeginBKPanel 始终作为背景最先显示
         BeginBKPanel:Show()
         if showCreateRoomPanel then

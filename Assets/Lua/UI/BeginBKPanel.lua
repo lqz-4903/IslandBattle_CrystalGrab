@@ -3,6 +3,7 @@ BasePanel:subClass("BeginBKPanel")
 
 -- 面板名称（对应AB包中的预制体名称）
 BeginBKPanel.panelName = "BeginBKPanel"
+BeginBKPanel.canvasLayer = "Static"
 
 -- 单例引用
 BeginBKPanel.instance = nil
